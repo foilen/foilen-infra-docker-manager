@@ -1,0 +1,61 @@
+buildscript {
+  repositories {
+    mavenLocal()
+    jcenter()
+  }
+}
+plugins {
+    id 'org.springframework.boot' version '1.5.9.RELEASE'
+}
+
+apply plugin: 'eclipse'
+apply plugin: 'java'
+
+group = 'com.foilen'
+version = System.getenv('VERSION')?:'master-SNAPSHOT'
+
+repositories {
+  mavenLocal()
+  jcenter()
+  mavenCentral()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+eclipse {
+  classpath {
+    downloadSources = true
+    downloadJavadoc = true
+  }
+}
+
+dependencies {
+
+  // Internal API
+  compile "com.foilen:foilen-infra-api:$foilenInfraApiVersion"
+  compile "com.foilen:foilen-infra-plugin-core-execute:$foilenInfraPluginVersion"
+
+  // Databases
+  compile "com.h2database:h2"
+  compile "org.springframework.boot:spring-boot-starter-data-jpa"
+  compile "org.springframework.boot:spring-boot-starter-jdbc"
+  
+  // Spring
+  compile "org.springframework:spring-context"
+
+  // Misc
+  compile "args4j:args4j:$argsVersion"
+  compile "com.foilen:jl-smalltools:$smalltoolsVersion"
+
+  // Test
+  testCompile 'junit:junit'
+  testCompile "org.springframework:spring-test"
+  testCompile "org.springframework.boot:spring-boot-starter-test"
+}
+
+springBoot {
+  mainClass = 'com.foilen.infra.docker.manager.DockerManagerApp'
+}
+
+task wrapper(type: Wrapper) { gradleVersion = '4.1' }
