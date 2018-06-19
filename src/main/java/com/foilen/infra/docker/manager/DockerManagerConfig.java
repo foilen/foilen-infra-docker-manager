@@ -10,7 +10,6 @@
 package com.foilen.infra.docker.manager;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.foilen.infra.api.InfraApiUiConfigDetails;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DockerManagerConfig {
@@ -18,14 +17,9 @@ public class DockerManagerConfig {
     private String internalDatabasePath;
     private String persistedConfigPath;
     private String imageBuildPath;
-    private InfraApiUiConfigDetails infraApiUiConfigDetails;
 
     public String getImageBuildPath() {
         return imageBuildPath;
-    }
-
-    public InfraApiUiConfigDetails getInfraApiUiConfigDetails() {
-        return infraApiUiConfigDetails;
     }
 
     public String getInternalDatabasePath() {
@@ -38,10 +32,6 @@ public class DockerManagerConfig {
 
     public void setImageBuildPath(String imageBuildPath) {
         this.imageBuildPath = imageBuildPath;
-    }
-
-    public void setInfraApiUiConfigDetails(InfraApiUiConfigDetails infraApiUiConfigDetails) {
-        this.infraApiUiConfigDetails = infraApiUiConfigDetails;
     }
 
     public void setInternalDatabasePath(String internalDatabasePath) {

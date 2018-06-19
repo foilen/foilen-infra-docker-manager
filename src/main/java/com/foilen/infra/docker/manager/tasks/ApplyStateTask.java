@@ -29,11 +29,13 @@ import com.foilen.infra.plugin.system.utils.DockerUtils;
 import com.foilen.infra.plugin.system.utils.UnixUsersAndGroupsUtils;
 import com.foilen.infra.plugin.system.utils.impl.DockerUtilsImpl;
 import com.foilen.infra.plugin.system.utils.impl.UnixUsersAndGroupsUtilsImpl;
+import com.foilen.infra.plugin.system.utils.model.ContainersManageContext;
+import com.foilen.infra.plugin.system.utils.model.CronApplicationBuildDetails;
 import com.foilen.infra.plugin.system.utils.model.DockerState;
 import com.foilen.infra.plugin.system.utils.model.UnixUserDetail;
-import com.foilen.infra.plugin.v1.core.base.resources.UnixUser;
-import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinition;
 import com.foilen.infra.plugin.v1.model.outputter.docker.DockerContainerOutputContext;
+import com.foilen.infra.resource.application.Application;
+import com.foilen.infra.resource.unixuser.UnixUser;
 import com.foilen.smalltools.TimeoutRunnableHandler;
 import com.foilen.smalltools.tools.AbstractBasics;
 import com.foilen.smalltools.tools.CollectionsTools;
@@ -44,7 +46,6 @@ import com.foilen.smalltools.tools.JsonTools;
 import com.foilen.smalltools.tools.StringTools;
 import com.foilen.smalltools.tools.ThreadNameStateTool;
 import com.foilen.smalltools.tools.ThreadTools;
-import com.foilen.smalltools.tuple.Tuple2;
 
 @Component
 public class ApplyStateTask extends AbstractBasics implements Runnable {
@@ -79,9 +80,11 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
         hardTimeoutMs += machineSetup.getUnixUsers().size() * 30_000; // 30s per unix user
         hardTimeoutMs += machineSetup.getApplications().size() * 600_000; // 10m per application
         logger.info("Hard timeout set to {} ms. Max {}", hardTimeoutMs, DateTools.formatFull(DateTools.addDate(Calendar.MILLISECOND, (int) hardTimeoutMs)));
-
+        ThreadNameStateTool currentThreadNameStateTool = ThreadTools.nameThread();
         try {
             TimeoutRunnableHandler timeoutRunnableHandler = new TimeoutRunnableHandler(hardTimeoutMs, () -> {
+
+                currentThreadNameStateTool.change();
 
                 // Remove unused unix users
                 logger.info("Removing unneeded unix users");
@@ -91,7 +94,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         .collect(Collectors.toList());
                 List<String> toDeleteUnixUsers = dbService.unixUserFindAllNotNeeded(neededUnixUsers);
                 for (String toDeleteUnixUser : toDeleteUnixUsers) {
-                    logger.info("UnixUser: {}", toDeleteUnixUser);
+                    logger.info("UnixUser to delete: {}", toDeleteUnixUser);
                     if (unixUsersAndGroupsUtils.userRemove(toDeleteUnixUser)) {
                         dbService.unixUserDelete(toDeleteUnixUser);
                     } else {
@@ -101,7 +104,6 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                 // Install unix users
                 logger.info("Installing unix users");
-
                 for (UnixUser unixUser : machineSetup.getUnixUsers()) {
 
                     String username = unixUser.getName();
@@ -131,17 +133,32 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 }
 
                 // Install applications
-                logger.info("Install application");
-                List<Tuple2<DockerContainerOutputContext, IPApplicationDefinition>> outputContextAndApplicationDefinitions = machineSetup.getApplications().stream() //
-                        .map(application -> {
-                            String applicationName = application.getName();
-                            String buildDirectory = imageBuildPath + "/" + applicationName + "/";
-                            DirectoryTools.deleteFolder(buildDirectory);
+                logger.info("Installing applications");
+                ContainersManageContext containersManageContext = new ContainersManageContext();
+                containersManageContext.setDockerState(dockerState);
+                containersManageContext.setContainerManagementCallback(notFailedCallback);
+                for (Application application : machineSetup.getApplications()) {
+                    String applicationName = application.getName();
+                    String buildDirectory = imageBuildPath + "/" + applicationName + "/";
+                    DirectoryTools.deleteFolder(buildDirectory);
 
-                            return new Tuple2<>(new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory), application.getApplicationDefinition());
-                        }).collect(Collectors.toList());
+                    CronApplicationBuildDetails applicationBuildDetails = new CronApplicationBuildDetails();
+                    applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
+                    DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
+                    applicationBuildDetails.setOutputContext(outputContext);
+                    switch (application.getExecutionPolicy()) {
+                    case ALWAYS_ON:
+                        containersManageContext.getAlwaysRunningApplications().add(applicationBuildDetails);
+                        break;
+                    case CRON:
+                        applicationBuildDetails.setCronTime(application.getExecutionCronDetails());
+                        containersManageContext.getCronApplications().add(applicationBuildDetails);
+                        break;
+                    }
+                }
 
-                dockerUtils.containersManage(dockerState, outputContextAndApplicationDefinitions, notFailedCallback);
+                dockerUtils.containersManage(containersManageContext);
+
             });
             timeoutRunnableHandler.run();
         } catch (Exception e) {
@@ -167,7 +184,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
         infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
 
         // Get the previous DockerState
-        DockerState dockerState = dbService.dockerStateLoad(machineSetup);
+        DockerState dockerState = dbService.dockerStateLoad();
         updateRedirectionDetails(machineSetup, dockerState);
 
         // Go to the expected state
@@ -177,7 +194,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
         // If InfraUi details not set, quit as a single run
         if (!CollectionsTools.isAllItemNotNullOrEmpty(machineSetup.getUiApiBaseUrl(), machineSetup.getUiApiUserId(), machineSetup.getUiApiUserKey())) {
-            logger.info("The UI API details are not set or fully set. Quitting as a single run");
+            logger.info("The UI API details are not set or are not fully set. Quitting as a single run");
             return;
         }
 

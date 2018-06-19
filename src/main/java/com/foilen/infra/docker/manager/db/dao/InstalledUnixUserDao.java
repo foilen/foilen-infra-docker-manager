@@ -9,10 +9,14 @@
  */
 package com.foilen.infra.docker.manager.db.dao;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 
-import com.foilen.infra.docker.manager.db.model.InstalledUnixUser;
+public interface InstalledUnixUserDao {
 
-public interface InstalledUnixUserDao extends JpaRepository<InstalledUnixUser, String> {
+    void add(String username);
+
+    boolean delete(String username);
+
+    List<String> findAllAsList();
 
 }

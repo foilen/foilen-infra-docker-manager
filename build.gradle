@@ -30,23 +30,28 @@ eclipse {
   }
 }
 
+configurations {
+	testCompile.extendsFrom compileOnly
+}
+
 dependencies {
 
   // Internal API
   compile "com.foilen:foilen-infra-api:$foilenInfraApiVersion"
-  compile "com.foilen:foilen-infra-plugin-core-execute:$foilenInfraPluginVersion"
-
-  // Databases
-  compile "com.h2database:h2"
-  compile "org.springframework.boot:spring-boot-starter-data-jpa"
-  compile "org.springframework.boot:spring-boot-starter-jdbc"
+  compile "com.foilen:foilen-infra-system-core-execute:$foilenInfraSystemVersion"
+  
+  compile "com.foilen:foilen-infra-resource-application:0.1.0"
+  compile "com.foilen:foilen-infra-resource-machine:0.1.1"
+  compile "com.foilen:foilen-infra-resource-unixuser:0.1.0"
   
   // Spring
   compile "org.springframework:spring-context"
+  compile "org.springframework.boot:spring-boot-starter"
 
   // Misc
   compile "args4j:args4j:$argsVersion"
   compile "com.foilen:jl-smalltools:$smalltoolsVersion"
+  compile "org.quartz-scheduler:quartz"
 
   // Test
   testCompile 'junit:junit'
@@ -58,4 +63,4 @@ springBoot {
   mainClass = 'com.foilen.infra.docker.manager.DockerManagerApp'
 }
 
-task wrapper(type: Wrapper) { gradleVersion = '4.1' }
+task wrapper(type: Wrapper) { gradleVersion = '4.7' }

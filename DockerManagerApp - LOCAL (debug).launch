@@ -8,6 +8,6 @@
 </listAttribute>
 <stringAttribute key="org.eclipse.jdt.launching.CLASSPATH_PROVIDER" value="org.eclipse.buildship.core.classpathprovider"/>
 <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="com.foilen.infra.docker.manager.DockerManagerApp"/>
-<stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="--mode LOCAL"/>
+<stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="--mode LOCAL --debug"/>
 <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="foilen-infra-docker-manager"/>
 </launchConfiguration>

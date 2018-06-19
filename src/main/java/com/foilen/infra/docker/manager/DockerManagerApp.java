@@ -21,14 +21,11 @@ import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.boot.Banner.Mode;
 import org.springframework.boot.SpringApplication;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.web.context.support.StandardServletEnvironment;
 
-import com.foilen.infra.api.InfraApiUiConfigDetails;
 import com.foilen.infra.api.model.MachineSetup;
-import com.foilen.infra.docker.manager.configspring.StartManagerConfig;
-import com.foilen.infra.docker.manager.configspring.StartUpgradesConfig;
+import com.foilen.infra.docker.manager.configspring.DockerManagerSpringConfig;
 import com.foilen.smalltools.JavaEnvironmentValues;
 import com.foilen.smalltools.tools.DirectoryTools;
 import com.foilen.smalltools.tools.JsonTools;
@@ -81,23 +78,21 @@ public class DockerManagerApp {
             if ("LOCAL".equals(options.mode)) {
                 logger.info("Setting some values for LOCAL mode");
 
-                InfraApiUiConfigDetails infraApiUiConfigDetails = new InfraApiUiConfigDetails();
-                config.setInfraApiUiConfigDetails(infraApiUiConfigDetails);
-
                 config.setInternalDatabasePath(JavaEnvironmentValues.getWorkingDirectory() + "/_dockerManager");
                 config.setPersistedConfigPath(JavaEnvironmentValues.getWorkingDirectory() + "/_persistedConfig");
                 config.setImageBuildPath(JavaEnvironmentValues.getWorkingDirectory() + "/_imageBuild");
 
                 // Create MachineSetup file
+                DirectoryTools.createPath(config.getInternalDatabasePath());
                 DirectoryTools.createPath(config.getPersistedConfigPath());
                 JsonTools.writeToFile(config.getPersistedConfigPath() + "/machineSetup.json", new MachineSetup());
             }
 
             // Check needed config and add it to the known properties
-            BeanWrapper loginConfigBeanWrapper = new BeanWrapperImpl(config);
-            for (PropertyDescriptor propertyDescriptor : loginConfigBeanWrapper.getPropertyDescriptors()) {
+            BeanWrapper configBeanWrapper = new BeanWrapperImpl(config);
+            for (PropertyDescriptor propertyDescriptor : configBeanWrapper.getPropertyDescriptors()) {
                 String propertyName = propertyDescriptor.getName();
-                Object propertyValue = loginConfigBeanWrapper.getPropertyValue(propertyName);
+                Object propertyValue = configBeanWrapper.getPropertyValue(propertyName);
                 if (propertyValue == null || propertyValue.toString().isEmpty()) {
                     System.err.println(propertyName + " in the config cannot be null or empty");
                     System.exit(1);
@@ -113,11 +108,13 @@ public class DockerManagerApp {
                 LogbackTools.changeConfig("/logback.xml");
             }
 
-            String[] springBootArgsArray = springBootArgs.toArray(new String[springBootArgs.size()]);
-
-            startUpgrader(springBootArgsArray);
-
-            startManager(springBootArgsArray);
+            // Start the Spring Boot app
+            SpringApplication application = new SpringApplication(DockerManagerSpringConfig.class);
+            application.setBannerMode(Mode.OFF);
+            List<String> profiles = new ArrayList<>();
+            profiles.add(System.getProperty("MODE"));
+            application.setAdditionalProfiles(profiles.toArray(new String[profiles.size()]));
+            application.run(args);
 
             // Check if debug
             if (options.debug) {
@@ -133,33 +130,6 @@ public class DockerManagerApp {
         System.out.println("Usage:");
         CmdLineParser cmdLineParser = new CmdLineParser(new DockerManagerOptions());
         cmdLineParser.printUsage(System.out);
-    }
-
-    private static void startManager(String args[]) {
-
-        logger.info("[MANAGER] Begin");
-
-        SpringApplication application = new SpringApplication(StartManagerConfig.class);
-        application.setBannerMode(Mode.OFF);
-        List<String> profiles = new ArrayList<>();
-        profiles.add(System.getProperty("MODE"));
-        application.setAdditionalProfiles(profiles.toArray(new String[profiles.size()]));
-        application.run(args);
-
-        logger.info("[MANAGER] Started");
-    }
-
-    private static void startUpgrader(String args[]) {
-        logger.info("[UPGRADER] Begin");
-
-        // Prepare Spring
-        AnnotationConfigApplicationContext upgraderAppCtx = new AnnotationConfigApplicationContext();
-        upgraderAppCtx.getEnvironment().setActiveProfiles(System.getProperty("MODE"));
-        upgraderAppCtx.register(StartUpgradesConfig.class);
-        upgraderAppCtx.refresh();
-        upgraderAppCtx.close();
-
-        logger.info("[UPGRADER] End");
     }
 
 }

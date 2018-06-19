@@ -9,10 +9,12 @@
  */
 package com.foilen.infra.docker.manager.db.dao;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.foilen.infra.plugin.system.utils.model.DockerState;
 
-import com.foilen.infra.docker.manager.db.model.RunningContainerState;
+public interface DockerStateDao {
 
-public interface RunningContainerStateDao extends JpaRepository<RunningContainerState, String> {
+    DockerState load();
+
+    void save(DockerState dockerState);
 
 }
