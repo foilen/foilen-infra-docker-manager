@@ -10,8 +10,12 @@
 package com.foilen.infra.docker.manager.tasks;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -33,6 +37,7 @@ import com.foilen.infra.plugin.system.utils.model.ContainersManageContext;
 import com.foilen.infra.plugin.system.utils.model.CronApplicationBuildDetails;
 import com.foilen.infra.plugin.system.utils.model.DockerState;
 import com.foilen.infra.plugin.system.utils.model.UnixUserDetail;
+import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionService;
 import com.foilen.infra.plugin.v1.model.outputter.docker.DockerContainerOutputContext;
 import com.foilen.infra.resource.application.Application;
 import com.foilen.infra.resource.unixuser.UnixUser;
@@ -44,6 +49,7 @@ import com.foilen.smalltools.tools.DirectoryTools;
 import com.foilen.smalltools.tools.FileTools;
 import com.foilen.smalltools.tools.JsonTools;
 import com.foilen.smalltools.tools.StringTools;
+import com.foilen.smalltools.tools.SystemTools;
 import com.foilen.smalltools.tools.ThreadNameStateTool;
 import com.foilen.smalltools.tools.ThreadTools;
 
@@ -62,8 +68,19 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     @Value("${dockerManager.imageBuildPath}")
     private String imageBuildPath;
 
+    private String hostFs = SystemTools.getPropertyOrEnvironment("HOSTFS", "/");
+
     private DockerUtils dockerUtils = new DockerUtilsImpl();
     private UnixUsersAndGroupsUtils unixUsersAndGroupsUtils = new UnixUsersAndGroupsUtilsImpl();
+
+    private void addIfIdSet(Map<Integer, List<String>> applicationNamesByUnixUserId, Integer unixUserId, String applicationName) {
+        if (unixUserId != null) {
+            List<String> applicationNames = CollectionsTools.getOrCreateEmptyArrayList(applicationNamesByUnixUserId, unixUserId, String.class);
+            if (!applicationNames.contains(applicationName)) {
+                applicationNames.add(applicationName);
+            }
+        }
+    }
 
     private void applyState(DockerState dockerState, MachineSetup machineSetup) {
 
@@ -104,10 +121,12 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                 // Install unix users
                 logger.info("Installing unix users");
+                Map<Integer, String> unixUserNameById = new HashMap<>();
                 for (UnixUser unixUser : machineSetup.getUnixUsers()) {
 
                     String username = unixUser.getName();
                     logger.info("UnixUser: {}", username);
+                    unixUserNameById.put(unixUser.getId(), username);
                     UnixUserDetail existingUser = unixUsersAndGroupsUtils.userGet(username);
                     if (existingUser == null) {
                         // Create
@@ -137,11 +156,19 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 ContainersManageContext containersManageContext = new ContainersManageContext();
                 containersManageContext.setDockerState(dockerState);
                 containersManageContext.setContainerManagementCallback(notFailedCallback);
+                Map<Integer, List<String>> applicationNamesByUnixUserId = new HashMap<>();
                 for (Application application : machineSetup.getApplications()) {
                     String applicationName = application.getName();
                     String buildDirectory = imageBuildPath + "/" + applicationName + "/";
                     DirectoryTools.deleteFolder(buildDirectory);
 
+                    // Associate the application name to all the running users (dor docker-sudo)
+                    addIfIdSet(applicationNamesByUnixUserId, application.getApplicationDefinition().getRunAs(), applicationName);
+                    for (IPApplicationDefinitionService service : application.getApplicationDefinition().getServices()) {
+                        addIfIdSet(applicationNamesByUnixUserId, service.getRunAs(), applicationName);
+                    }
+
+                    // Add applications details
                     CronApplicationBuildDetails applicationBuildDetails = new CronApplicationBuildDetails();
                     applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
                     DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
@@ -158,6 +185,39 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 }
 
                 dockerUtils.containersManage(containersManageContext);
+
+                // Install docker-sudo configuration
+                String dockerSudoConfPath = hostFs + "/etc/docker-sudo/";
+                DirectoryTools.createPath(dockerSudoConfPath, "root", "root", "644");
+                List<String> filesToRemove = new ArrayList<>();
+                for (String file : new File(dockerSudoConfPath).list()) {
+                    filesToRemove.add(file);
+                }
+                // Go through all unix users
+                for (Integer unixUserId : applicationNamesByUnixUserId.keySet()) {
+                    String unixUserName = unixUserNameById.get(unixUserId);
+                    if (unixUserName == null) {
+                        continue;
+                    }
+
+                    // Get the config file
+                    String configFileName = "containers-" + unixUserName + ".conf";
+                    String fullConfigPath = dockerSudoConfPath + configFileName;
+                    filesToRemove.remove(configFileName);
+
+                    // Write information in it
+                    List<String> applicationNames = applicationNamesByUnixUserId.get(unixUserId);
+                    Collections.sort(applicationNames);
+                    logger.info("Saving {} with {} entries", fullConfigPath, applicationNames.size());
+                    FileTools.writeFileWithContentCheck(fullConfigPath, applicationNames);
+                }
+
+                // Delete extra config
+                for (String fileToRemove : filesToRemove) {
+                    String fullConfigPath = dockerSudoConfPath + fileToRemove;
+                    logger.info("Deleting extra file {}", fullConfigPath);
+                    FileTools.deleteFile(fullConfigPath);
+                }
 
             });
             timeoutRunnableHandler.run();

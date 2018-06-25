@@ -2,6 +2,21 @@
 
 The daemon that configures the local host from a foilen-ui service.
 
+# More information
+
+## Docker-sudo
+
+Description: This application is creating users and is installing applications that they run. Since everything is running with Docker and we do not want to give full access to it to everyone while giving them access to their running application, this application is configuring *docker-sudo* in a way that each user can manage their containers.
+
+Installation:
+
+```bash
+echo "deb https://dl.bintray.com/foilen/debian stable main" | sudo tee /etc/apt/sources.list.d/foilen.list
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
+sudo apt update
+sudo apt install docker-sudo
+```
+
 # Usage
 
 ## Configuration environment
@@ -114,6 +129,18 @@ docker run -ti \
 
 # Check the db files
 sudo find /home/testing/data
+
+# Try docker-sudo
+sudo su testing
+docker-sudo
+docker-sudo ps
+docker-sudo logs mariadb
+docker-sudo tails mariadb
+docker-sudo bash mariadb
+	mysql -u root -pqwerty
+		show databases;
+		create database testing;
+		show databases;
 
 # Cleanup
 docker stop mariadb
