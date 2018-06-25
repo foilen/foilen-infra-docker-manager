@@ -255,6 +255,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
         // If InfraUi details not set, quit as a single run
         if (!CollectionsTools.isAllItemNotNullOrEmpty(machineSetup.getUiApiBaseUrl(), machineSetup.getUiApiUserId(), machineSetup.getUiApiUserKey())) {
             logger.info("The UI API details are not set or are not fully set. Quitting as a single run");
+            System.exit(0);
             return;
         }
 
