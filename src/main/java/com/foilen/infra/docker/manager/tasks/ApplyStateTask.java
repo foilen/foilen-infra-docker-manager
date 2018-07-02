@@ -73,7 +73,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     private DockerUtils dockerUtils = new DockerUtilsImpl();
     private UnixUsersAndGroupsUtils unixUsersAndGroupsUtils = new UnixUsersAndGroupsUtilsImpl();
 
-    private void addIfIdSet(Map<Integer, List<String>> applicationNamesByUnixUserId, Integer unixUserId, String applicationName) {
+    private void addIfIdSet(Map<Long, List<String>> applicationNamesByUnixUserId, Long unixUserId, String applicationName) {
         if (unixUserId != null) {
             List<String> applicationNames = CollectionsTools.getOrCreateEmptyArrayList(applicationNamesByUnixUserId, unixUserId, String.class);
             if (!applicationNames.contains(applicationName)) {
@@ -121,7 +121,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                 // Install unix users
                 logger.info("Installing unix users");
-                Map<Integer, String> unixUserNameById = new HashMap<>();
+                Map<Long, String> unixUserNameById = new HashMap<>();
                 for (UnixUser unixUser : machineSetup.getUnixUsers()) {
 
                     String username = unixUser.getName();
@@ -156,7 +156,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 ContainersManageContext containersManageContext = new ContainersManageContext();
                 containersManageContext.setDockerState(dockerState);
                 containersManageContext.setContainerManagementCallback(notFailedCallback);
-                Map<Integer, List<String>> applicationNamesByUnixUserId = new HashMap<>();
+                Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
                 for (Application application : machineSetup.getApplications()) {
                     String applicationName = application.getName();
                     String buildDirectory = imageBuildPath + "/" + applicationName + "/";
@@ -194,7 +194,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     filesToRemove.add(file);
                 }
                 // Go through all unix users
-                for (Integer unixUserId : applicationNamesByUnixUserId.keySet()) {
+                for (Long unixUserId : applicationNamesByUnixUserId.keySet()) {
                     String unixUserName = unixUserNameById.get(unixUserId);
                     if (unixUserName == null) {
                         continue;

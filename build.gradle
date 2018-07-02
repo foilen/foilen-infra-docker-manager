@@ -40,9 +40,9 @@ dependencies {
   compile "com.foilen:foilen-infra-api:$foilenInfraApiVersion"
   compile "com.foilen:foilen-infra-system-core-execute:$foilenInfraSystemVersion"
   
-  compile "com.foilen:foilen-infra-resource-application:0.1.0"
+  compile "com.foilen:foilen-infra-resource-application:0.1.1"
   compile "com.foilen:foilen-infra-resource-machine:0.1.1"
-  compile "com.foilen:foilen-infra-resource-unixuser:0.1.0"
+  compile "com.foilen:foilen-infra-resource-unixuser:0.1.2"
   
   // Spring
   compile "org.springframework:spring-context"
@@ -50,7 +50,6 @@ dependencies {
 
   // Misc
   compile "args4j:args4j:$argsVersion"
-  compile "com.foilen:jl-smalltools:$smalltoolsVersion"
   compile "org.quartz-scheduler:quartz"
 
   // Test
