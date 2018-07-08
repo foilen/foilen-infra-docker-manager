@@ -26,6 +26,7 @@ import org.springframework.stereotype.Component;
 
 import com.foilen.infra.api.InfraApiService;
 import com.foilen.infra.api.model.MachineSetup;
+import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.docker.manager.db.services.DbService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
@@ -270,7 +271,13 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 if (infraApiService == null) {
                     continue;
                 }
-                machineSetup = infraApiService.getInfraMachineApiService().getMachineSetup(machineSetup.getMachineName());
+
+                ResponseMachineSetup responseMachineSetup = infraApiService.getInfraMachineApiService().getMachineSetup(machineSetup.getMachineName());
+                if (!responseMachineSetup.isSuccess()) {
+                    logger.error("Could not retrieve the machine setup. Errors: {} ; Warnings: {}", responseMachineSetup.getErrors(), responseMachineSetup.getWarnings());
+                    continue;
+                }
+                machineSetup = responseMachineSetup.getItem();
                 infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
                 updateRedirectionDetails(machineSetup, dockerState);
                 JsonTools.writeToFile(machineSetupFile + "-tmp", machineSetup);
