@@ -124,6 +124,7 @@ docker run -ti \
   --volume /usr/bin/docker:/usr/bin/docker \
   --volume /usr/lib/x86_64-linux-gnu/libltdl.so.7.3.1:/usr/lib/x86_64-linux-gnu/libltdl.so.7 \
   --volume /var/run/docker.sock:/var/run/docker.sock \
+  --hostname $(hostname -f) \
   --workdir /data \
   foilen-infra-docker-manager:master-SNAPSHOT
 
