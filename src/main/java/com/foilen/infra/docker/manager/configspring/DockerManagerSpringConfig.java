@@ -13,11 +13,13 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import com.foilen.smalltools.tools.SpringTools;
 
 @Configuration
 @EnableAutoConfiguration
+@EnableScheduling
 @ComponentScan({ "com.foilen.infra.docker.manager.db", "com.foilen.infra.docker.manager.services", "com.foilen.infra.docker.manager.tasks" })
 public class DockerManagerSpringConfig {
 
