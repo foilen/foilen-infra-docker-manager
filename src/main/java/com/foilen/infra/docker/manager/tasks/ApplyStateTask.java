@@ -174,6 +174,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
                     DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
                     applicationBuildDetails.setOutputContext(outputContext);
+                    outputContext.setDockerLogsMaxSizeMB(100);
                     switch (application.getExecutionPolicy()) {
                     case ALWAYS_ON:
                         containersManageContext.getAlwaysRunningApplications().add(applicationBuildDetails);
