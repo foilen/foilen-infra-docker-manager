@@ -113,7 +113,8 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 List<String> toDeleteUnixUsers = dbService.unixUserFindAllNotNeeded(neededUnixUsers);
                 for (String toDeleteUnixUser : toDeleteUnixUsers) {
                     logger.info("UnixUser to delete: {}", toDeleteUnixUser);
-                    if (unixUsersAndGroupsUtils.userRemove(toDeleteUnixUser)) {
+                    UnixUserDetail toDeleteUnixUserDetails = unixUsersAndGroupsUtils.userGet(toDeleteUnixUser);
+                    if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName(), toDeleteUnixUserDetails.getHomeFolder())) {
                         dbService.unixUserDelete(toDeleteUnixUser);
                     } else {
                         logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
