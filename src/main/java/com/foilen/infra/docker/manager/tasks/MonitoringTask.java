@@ -10,7 +10,6 @@
 package com.foilen.infra.docker.manager.tasks;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ConnectException;
 import java.nio.file.Files;
@@ -57,21 +56,10 @@ public class MonitoringTask extends AbstractBasics {
     @Scheduled(cron = "0 52 0 * * *")
     public void cleanupUnsentStats() {
         try {
-            long expiredBefore = DateTools.addDate(Calendar.WEEK_OF_YEAR, -1).getTime();
-
-            Files.list(systemStatFolder.toPath()) //
-                    .map(it -> it.toFile()) //
-                    .filter(it -> it.isFile()) //
-                    .filter(it -> it.lastModified() < expiredBefore) //
-                    .forEach(it -> {
-                        logger.info("Removing old {}", it.getAbsolutePath());
-                        boolean deleted = it.delete();
-                        if (!deleted) {
-                            logger.error("Could not delete {}", it.getAbsolutePath());
-                        }
-                    });
-        } catch (IOException e) {
-            logger.error("Problem cleaning up the stats");
+            Date expiredBefore = DateTools.addDate(Calendar.WEEK_OF_YEAR, -1);
+            DirectoryTools.deleteOlderFilesInDirectory(systemStatFolder, expiredBefore);
+        } catch (Throwable e) {
+            logger.error("Problem cleaning up the stats", e);
         }
     }
 
