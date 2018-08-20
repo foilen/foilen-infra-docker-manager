@@ -30,6 +30,7 @@ import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.docker.manager.db.services.DbService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
+import com.foilen.infra.docker.manager.tasks.callback.SaveTransformedApplicationDefinitionCallback;
 import com.foilen.infra.plugin.system.utils.DockerUtils;
 import com.foilen.infra.plugin.system.utils.UnixUsersAndGroupsUtils;
 import com.foilen.infra.plugin.system.utils.impl.DockerUtilsImpl;
@@ -63,6 +64,8 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     private InfraUiApiClientManagementService infraUiApiClientManagementService;
     @Autowired
     private NotFailedCallback notFailedCallback;
+    @Autowired
+    private SaveTransformedApplicationDefinitionCallback saveTransformedApplicationDefinitionCallback;
 
     @Value("${dockerManager.persistedConfigPath}")
     private String persistedConfigPath;
@@ -158,6 +161,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 ContainersManageContext containersManageContext = new ContainersManageContext();
                 containersManageContext.setDockerState(dockerState);
                 containersManageContext.setContainerManagementCallback(notFailedCallback);
+                containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
                 Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
                 for (Application application : machineSetup.getApplications()) {
                     String applicationName = application.getName();
