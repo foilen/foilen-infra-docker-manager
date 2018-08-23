@@ -279,11 +279,11 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 }
 
                 ResponseMachineSetup responseMachineSetup = infraApiService.getInfraMachineApiService().getMachineSetup(machineSetup.getMachineName());
-                if (!responseMachineSetup.isSuccess()) {
-                    logger.error("Could not retrieve the machine setup. Errors: {} ; Warnings: {}", responseMachineSetup.getErrors(), responseMachineSetup.getWarnings());
-                    continue;
+                if (responseMachineSetup.isSuccess()) {
+                    machineSetup = responseMachineSetup.getItem();
+                } else {
+                    logger.error("Could not retrieve the machine setup. Will use persisted one. Errors: {} ; Warnings: {}", responseMachineSetup.getErrors(), responseMachineSetup.getWarnings());
                 }
-                machineSetup = responseMachineSetup.getItem();
                 infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
                 updateRedirectionDetails(machineSetup, dockerState);
                 JsonTools.writeToFile(machineSetupFile + "-tmp", machineSetup);
