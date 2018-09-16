@@ -51,7 +51,6 @@ dependencies {
   // Misc
   compile "args4j:args4j:$argsVersion"
   compile 'org.freemarker:freemarker:2.3.23'
-  compile "org.quartz-scheduler:quartz"
 
   // Test
   testCompile 'junit:junit'
