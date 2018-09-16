@@ -27,8 +27,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.foilen.infra.api.InfraApiService;
 import com.foilen.infra.api.model.SystemStats;
+import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.services.SystemStatisticsService;
 import com.foilen.smalltools.JavaEnvironmentValues;

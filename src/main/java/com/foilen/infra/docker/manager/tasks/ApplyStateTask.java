@@ -24,9 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import com.foilen.infra.api.InfraApiService;
 import com.foilen.infra.api.model.MachineSetup;
 import com.foilen.infra.api.response.ResponseMachineSetup;
+import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
@@ -283,7 +283,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     if (responseMachineSetup.isSuccess()) {
                         machineSetup = responseMachineSetup.getItem();
                     } else {
-                        logger.error("Could not retrieve the machine setup. Will use persisted one. Errors: {} ; Warnings: {}", responseMachineSetup.getErrors(), responseMachineSetup.getWarnings());
+                        logger.error("Could not retrieve the machine setup. Will use persisted one. Error: {}", responseMachineSetup.getError());
                     }
                 } catch (Exception e) {
                     logger.error("Could not retrieve the machine setup. Will use persisted one.", e);

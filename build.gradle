@@ -42,7 +42,7 @@ dependencies {
   
   compile "com.foilen:foilen-infra-resource-application:0.1.1"
   compile "com.foilen:foilen-infra-resource-machine:0.1.1"
-  compile "com.foilen:foilen-infra-resource-unixuser:0.1.2"
+  compile "com.foilen:foilen-infra-resource-unixuser:0.1.6"
   
   // Spring
   compile "org.springframework:spring-context"
