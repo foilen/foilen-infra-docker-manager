@@ -54,6 +54,7 @@ import com.foilen.smalltools.tools.StringTools;
 import com.foilen.smalltools.tools.SystemTools;
 import com.foilen.smalltools.tools.ThreadNameStateTool;
 import com.foilen.smalltools.tools.ThreadTools;
+import com.foilen.smalltools.tuple.Tuple3;
 
 @Component
 public class ApplyStateTask extends AbstractBasics implements Runnable {
@@ -163,12 +164,13 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 containersManageContext.setContainerManagementCallback(notFailedCallback);
                 containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
                 Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
+                List<Tuple3<String, String, Integer>> appNameEndpointNameAndPorts = new ArrayList<>();
                 for (Application application : machineSetup.getApplications()) {
                     String applicationName = application.getName();
                     String buildDirectory = imageBuildPath + "/" + applicationName + "/";
                     DirectoryTools.deleteFolder(buildDirectory);
 
-                    // Associate the application name to all the running users (dor docker-sudo)
+                    // Associate the application name to all the running users (for docker-sudo)
                     addIfIdSet(applicationNamesByUnixUserId, application.getApplicationDefinition().getRunAs(), applicationName);
                     for (IPApplicationDefinitionService service : application.getApplicationDefinition().getServices()) {
                         addIfIdSet(applicationNamesByUnixUserId, service.getRunAs(), applicationName);
@@ -189,18 +191,23 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         containersManageContext.getCronApplications().add(applicationBuildDetails);
                         break;
                     }
+
+                    // Keep the exposed ports
+                    application.getApplicationDefinition().getPortsEndpoint().forEach((port, endpoint) -> {
+                        appNameEndpointNameAndPorts.add(new Tuple3<>(applicationName, endpoint, port));
+                    });
                 }
 
                 dockerUtils.containersManage(containersManageContext);
 
                 // Install docker-sudo configuration
                 String dockerSudoConfPath = hostFs + "/etc/docker-sudo/";
-                DirectoryTools.createPath(dockerSudoConfPath, "root", "root", "644");
+                DirectoryTools.createPath(dockerSudoConfPath, "root", "root", "755");
                 List<String> filesToRemove = new ArrayList<>();
                 for (String file : new File(dockerSudoConfPath).list()) {
                     filesToRemove.add(file);
                 }
-                // Go through all unix users
+
                 for (Long unixUserId : applicationNamesByUnixUserId.keySet()) {
                     String unixUserName = unixUserNameById.get(unixUserId);
                     if (unixUserName == null) {
@@ -217,11 +224,49 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     Collections.sort(applicationNames);
                     logger.info("Saving {} with {} entries", fullConfigPath, applicationNames.size());
                     FileTools.writeFileWithContentCheck(fullConfigPath, applicationNames);
+                    FileTools.changePermissions(fullConfigPath, false, "644");
                 }
 
-                // Delete extra config
                 for (String fileToRemove : filesToRemove) {
                     String fullConfigPath = dockerSudoConfPath + fileToRemove;
+                    logger.info("Deleting extra file {}", fullConfigPath);
+                    FileTools.deleteFile(fullConfigPath);
+                }
+
+                // Registry of all exposed services
+                logger.info("Keep a listing of the applications endpoints. Amount: {}", appNameEndpointNameAndPorts.size());
+                filesToRemove.clear();
+                String applicationEndpointsPath = hostFs + "/var/infra-endpoints/";
+                DirectoryTools.createPath(applicationEndpointsPath, "root", "root", "755");
+                for (String file : new File(applicationEndpointsPath).list()) {
+                    filesToRemove.add(file);
+                }
+
+                for (Tuple3<String, String, Integer> appNameEndpointNameAndPort : appNameEndpointNameAndPorts) {
+                    String applicationName = appNameEndpointNameAndPort.getA();
+                    String endpoint = appNameEndpointNameAndPort.getB();
+                    int port = appNameEndpointNameAndPort.getC();
+                    logger.info("Processing {}/{}/{}", applicationName, endpoint, port);
+                    String ip = dockerState.getIpByName().get(applicationName);
+                    if (ip == null) {
+                        logger.info("Skipping {}/{}/{} because we do not know the IP of the app (most likely not running)");
+                        continue;
+                    }
+
+                    // Get the config file
+                    String configFileName = applicationName + "_" + endpoint;
+                    String fullConfigPath = applicationEndpointsPath + configFileName;
+                    filesToRemove.remove(configFileName);
+
+                    // Write information in it
+                    String hostPort = ip + ":" + port;
+                    logger.info("Saving {} with content {}", fullConfigPath, hostPort);
+                    FileTools.writeFileWithContentCheck(fullConfigPath, hostPort);
+                    FileTools.changePermissions(fullConfigPath, false, "644");
+                }
+
+                for (String fileToRemove : filesToRemove) {
+                    String fullConfigPath = applicationEndpointsPath + fileToRemove;
                     logger.info("Deleting extra file {}", fullConfigPath);
                     FileTools.deleteFile(fullConfigPath);
                 }
