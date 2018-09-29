@@ -11,6 +11,7 @@ package com.foilen.infra.docker.manager.tasks;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,6 +55,7 @@ import com.foilen.smalltools.tools.StringTools;
 import com.foilen.smalltools.tools.SystemTools;
 import com.foilen.smalltools.tools.ThreadNameStateTool;
 import com.foilen.smalltools.tools.ThreadTools;
+import com.foilen.smalltools.tuple.Tuple2;
 import com.foilen.smalltools.tuple.Tuple3;
 
 @Component
@@ -201,11 +203,13 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 dockerUtils.containersManage(containersManageContext);
 
                 // Install docker-sudo configuration
+                logger.info("Install docker-sudo configuration");
                 String dockerSudoConfPath = hostFs + "/etc/docker-sudo/";
                 DirectoryTools.createPath(dockerSudoConfPath, "root", "root", "755");
                 List<String> filesToRemove = new ArrayList<>();
                 for (String file : new File(dockerSudoConfPath).list()) {
                     filesToRemove.add(file);
+                    filesToRemove.remove("images");
                 }
 
                 for (Long unixUserId : applicationNamesByUnixUserId.keySet()) {
@@ -231,6 +235,32 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     String fullConfigPath = dockerSudoConfPath + fileToRemove;
                     logger.info("Deleting extra file {}", fullConfigPath);
                     FileTools.deleteFile(fullConfigPath);
+                }
+
+                // Install docker-sudo images
+                logger.info("Install docker-sudo images");
+                String dockerSudoImagesPath = hostFs + "/etc/docker-sudo/images/";
+                DirectoryTools.createPath(dockerSudoImagesPath, "root", "root", "755");
+                List<Tuple2<String, String>> dockerSudoImages = Arrays.asList( //
+                        new Tuple2<>("mariadb", "mariadb:10.3") //
+                );
+                filesToRemove = new ArrayList<>();
+                for (String file : new File(dockerSudoImagesPath).list()) {
+                    filesToRemove.add(file);
+                }
+                for (Tuple2<String, String> image : dockerSudoImages) {
+                    logger.info("Installing image {} using {}", image.getA(), image.getB());
+                    filesToRemove.remove(image.getA());
+
+                    String fullImagePath = dockerSudoImagesPath + image.getA();
+                    DirectoryTools.createPath(fullImagePath, "root", "root", "755");
+                    FileTools.writeFile("FROM " + image.getB() + "\n", new File(fullImagePath + "/Dockerfile"), "root", "root", "644");
+                }
+
+                for (String fileToRemove : filesToRemove) {
+                    String fullImagePath = dockerSudoImagesPath + fileToRemove;
+                    logger.info("Deleting extra directory {}", fullImagePath);
+                    DirectoryTools.deleteFolder(fullImagePath);
                 }
 
                 // Registry of all exposed services
