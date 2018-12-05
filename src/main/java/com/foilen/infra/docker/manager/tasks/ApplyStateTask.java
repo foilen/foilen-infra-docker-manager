@@ -25,7 +25,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.foilen.infra.api.model.Application;
 import com.foilen.infra.api.model.MachineSetup;
+import com.foilen.infra.api.model.UnixUser;
 import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;
@@ -42,8 +44,6 @@ import com.foilen.infra.plugin.system.utils.model.DockerState;
 import com.foilen.infra.plugin.system.utils.model.UnixUserDetail;
 import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionService;
 import com.foilen.infra.plugin.v1.model.outputter.docker.DockerContainerOutputContext;
-import com.foilen.infra.resource.application.Application;
-import com.foilen.infra.resource.unixuser.UnixUser;
 import com.foilen.smalltools.TimeoutRunnableHandler;
 import com.foilen.smalltools.tools.AbstractBasics;
 import com.foilen.smalltools.tools.CollectionsTools;
