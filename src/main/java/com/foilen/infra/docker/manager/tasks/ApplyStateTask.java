@@ -366,9 +366,11 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                 infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
                 updateRedirectionDetails(machineSetup, dockerState);
-                JsonTools.writeToFile(machineSetupFile + "-tmp", machineSetup);
-                FileTools.deleteFile(machineSetupFile);
-                new File(machineSetupFile + "-tmp").renameTo(new File(machineSetupFile));
+                if (machineSetup != null) {
+                    JsonTools.writeToFile(machineSetupFile + "-tmp", machineSetup);
+                    FileTools.deleteFile(machineSetupFile);
+                    new File(machineSetupFile + "-tmp").renameTo(new File(machineSetupFile));
+                }
 
                 // Go to the expected state
                 logger.info("Apply state");
