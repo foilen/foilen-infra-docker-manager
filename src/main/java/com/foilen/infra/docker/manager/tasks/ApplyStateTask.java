@@ -100,6 +100,9 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
         logger.info("Starting to apply the desired setup. Has {} unix users and {} applications", machineSetup.getUnixUsers().size(), machineSetup.getApplications().size());
 
+        // Create the network if needed
+        dockerUtils.networkCreateIfNotExists(DockerUtilsImpl.NETWORK_NAME, "172.20.0.0/16");
+
         long hardTimeoutMs = 10000; // 10s
         hardTimeoutMs += machineSetup.getUnixUsers().size() * 30_000; // 30s per unix user
         hardTimeoutMs += machineSetup.getApplications().size() * 600_000; // 10m per application
@@ -277,7 +280,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     String endpoint = appNameEndpointNameAndPort.getB();
                     int port = appNameEndpointNameAndPort.getC();
                     logger.info("Processing {}/{}/{}", applicationName, endpoint, port);
-                    String ip = dockerState.getIpByName().get(applicationName);
+                    String ip = dockerState.getIpStateByName().get(applicationName).getIp();
                     if (ip == null) {
                         logger.info("Skipping {}/{}/{} because we do not know the IP of the app (most likely not running)");
                         continue;
