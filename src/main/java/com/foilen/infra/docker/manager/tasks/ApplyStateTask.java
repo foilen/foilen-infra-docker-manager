@@ -31,6 +31,7 @@ import com.foilen.infra.api.model.UnixUser;
 import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;
+import com.foilen.infra.docker.manager.services.GlobalLockService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
 import com.foilen.infra.docker.manager.tasks.callback.SaveTransformedApplicationDefinitionCallback;
@@ -63,6 +64,8 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
     @Autowired
     private DbService dbService;
+    @Autowired
+    private GlobalLockService globalLockService;
     @Autowired
     private InfraUiApiClientManagementService infraUiApiClientManagementService;
     @Autowired
@@ -98,219 +101,223 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 .appendText("Apply State") //
                 .change();
 
-        logger.info("Starting to apply the desired setup. Has {} unix users and {} applications", machineSetup.getUnixUsers().size(), machineSetup.getApplications().size());
+        globalLockService.executeInLock(() -> {
 
-        // Create the network if needed
-        dockerUtils.networkCreateIfNotExists(DockerUtilsImpl.NETWORK_NAME, "172.20.0.0/16");
+            logger.info("Starting to apply the desired setup. Has {} unix users and {} applications", machineSetup.getUnixUsers().size(), machineSetup.getApplications().size());
 
-        long hardTimeoutMs = 10000; // 10s
-        hardTimeoutMs += machineSetup.getUnixUsers().size() * 30_000; // 30s per unix user
-        hardTimeoutMs += machineSetup.getApplications().size() * 600_000; // 10m per application
-        logger.info("Hard timeout set to {} ms. Max {}", hardTimeoutMs, DateTools.formatFull(DateTools.addDate(Calendar.MILLISECOND, (int) hardTimeoutMs)));
-        ThreadNameStateTool currentThreadNameStateTool = ThreadTools.nameThread();
-        try {
-            TimeoutRunnableHandler timeoutRunnableHandler = new TimeoutRunnableHandler(hardTimeoutMs, () -> {
+            // Create the network if needed
+            dockerUtils.networkCreateIfNotExists(DockerUtilsImpl.NETWORK_NAME, "172.20.0.0/16");
 
-                currentThreadNameStateTool.change();
+            long hardTimeoutMs = 10000; // 10s
+            hardTimeoutMs += machineSetup.getUnixUsers().size() * 30_000; // 30s per unix user
+            hardTimeoutMs += machineSetup.getApplications().size() * 600_000; // 10m per application
+            logger.info("Hard timeout set to {} ms. Max {}", hardTimeoutMs, DateTools.formatFull(DateTools.addDate(Calendar.MILLISECOND, (int) hardTimeoutMs)));
+            ThreadNameStateTool currentThreadNameStateTool = ThreadTools.nameThread();
+            try {
+                TimeoutRunnableHandler timeoutRunnableHandler = new TimeoutRunnableHandler(hardTimeoutMs, () -> {
 
-                // Remove unused unix users
-                logger.info("Removing unneeded unix users");
-                List<String> neededUnixUsers = machineSetup.getUnixUsers().stream() //
-                        .map(UnixUser::getName) //
-                        .sorted() //
-                        .collect(Collectors.toList());
-                List<String> toDeleteUnixUsers = dbService.unixUserFindAllNotNeeded(neededUnixUsers);
-                for (String toDeleteUnixUser : toDeleteUnixUsers) {
-                    logger.info("UnixUser to delete: {}", toDeleteUnixUser);
-                    UnixUserDetail toDeleteUnixUserDetails = unixUsersAndGroupsUtils.userGet(toDeleteUnixUser);
-                    if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName(), toDeleteUnixUserDetails.getHomeFolder())) {
-                        dbService.unixUserDelete(toDeleteUnixUser);
-                    } else {
-                        logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
-                    }
-                }
+                    currentThreadNameStateTool.change();
 
-                // Install unix users
-                logger.info("Installing unix users");
-                Map<Long, String> unixUserNameById = new HashMap<>();
-                for (UnixUser unixUser : machineSetup.getUnixUsers()) {
-
-                    String username = unixUser.getName();
-                    logger.info("UnixUser: {}", username);
-                    unixUserNameById.put(unixUser.getId(), username);
-                    UnixUserDetail existingUser = unixUsersAndGroupsUtils.userGet(username);
-                    if (existingUser == null) {
-                        // Create
-                        logger.info("UnixUser: {} does not exist. Create it", username);
-                        if (unixUsersAndGroupsUtils.userCreate(username, unixUser.getId(), unixUser.getHomeFolder(), null, null)) {
-                            dbService.unixUserAdd(username);
+                    // Remove unused unix users
+                    logger.info("Removing unneeded unix users");
+                    List<String> neededUnixUsers = machineSetup.getUnixUsers().stream() //
+                            .map(UnixUser::getName) //
+                            .sorted() //
+                            .collect(Collectors.toList());
+                    List<String> toDeleteUnixUsers = dbService.unixUserFindAllNotNeeded(neededUnixUsers);
+                    for (String toDeleteUnixUser : toDeleteUnixUsers) {
+                        logger.info("UnixUser to delete: {}", toDeleteUnixUser);
+                        UnixUserDetail toDeleteUnixUserDetails = unixUsersAndGroupsUtils.userGet(toDeleteUnixUser);
+                        if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName(), toDeleteUnixUserDetails.getHomeFolder())) {
+                            dbService.unixUserDelete(toDeleteUnixUser);
                         } else {
-                            logger.error("UnixUser: {} was not created succesfully", username);
-                        }
-                    } else {
-                        // Update if needed
-                        if (!StringTools.safeEquals(unixUser.getHomeFolder(), existingUser.getHomeFolder())) {
-                            unixUsersAndGroupsUtils.userHomeUpdate(username, unixUser.getHomeFolder());
-                        }
-                        if (!StringTools.safeEquals(unixUser.getHashedPassword(), existingUser.getHashedPassword())) {
-                            unixUsersAndGroupsUtils.userPasswordUpdate(username, unixUser.getHashedPassword());
-                        }
-                        if (!StringTools.safeEquals(unixUser.getShell(), existingUser.getShell())) {
-                            unixUsersAndGroupsUtils.userShellUpdate(username, unixUser.getShell());
+                            logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
                         }
                     }
 
-                }
+                    // Install unix users
+                    logger.info("Installing unix users");
+                    Map<Long, String> unixUserNameById = new HashMap<>();
+                    for (UnixUser unixUser : machineSetup.getUnixUsers()) {
 
-                // Install applications
-                logger.info("Installing applications");
-                ContainersManageContext containersManageContext = new ContainersManageContext();
-                containersManageContext.setDockerState(dockerState);
-                containersManageContext.setContainerManagementCallback(notFailedCallback);
-                containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
-                Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
-                List<Tuple3<String, String, Integer>> appNameEndpointNameAndPorts = new ArrayList<>();
-                for (Application application : machineSetup.getApplications()) {
-                    String applicationName = application.getName();
-                    String buildDirectory = imageBuildPath + "/" + applicationName + "/";
-                    DirectoryTools.deleteFolder(buildDirectory);
+                        String username = unixUser.getName();
+                        logger.info("UnixUser: {}", username);
+                        unixUserNameById.put(unixUser.getId(), username);
+                        UnixUserDetail existingUser = unixUsersAndGroupsUtils.userGet(username);
+                        if (existingUser == null) {
+                            // Create
+                            logger.info("UnixUser: {} does not exist. Create it", username);
+                            if (unixUsersAndGroupsUtils.userCreate(username, unixUser.getId(), unixUser.getHomeFolder(), null, null)) {
+                                dbService.unixUserAdd(username);
+                            } else {
+                                logger.error("UnixUser: {} was not created succesfully", username);
+                            }
+                        } else {
+                            // Update if needed
+                            if (!StringTools.safeEquals(unixUser.getHomeFolder(), existingUser.getHomeFolder())) {
+                                unixUsersAndGroupsUtils.userHomeUpdate(username, unixUser.getHomeFolder());
+                            }
+                            if (!StringTools.safeEquals(unixUser.getHashedPassword(), existingUser.getHashedPassword())) {
+                                unixUsersAndGroupsUtils.userPasswordUpdate(username, unixUser.getHashedPassword());
+                            }
+                            if (!StringTools.safeEquals(unixUser.getShell(), existingUser.getShell())) {
+                                unixUsersAndGroupsUtils.userShellUpdate(username, unixUser.getShell());
+                            }
+                        }
 
-                    // Associate the application name to all the running users (for docker-sudo)
-                    addIfIdSet(applicationNamesByUnixUserId, application.getApplicationDefinition().getRunAs(), applicationName);
-                    for (IPApplicationDefinitionService service : application.getApplicationDefinition().getServices()) {
-                        addIfIdSet(applicationNamesByUnixUserId, service.getRunAs(), applicationName);
                     }
 
-                    // Add applications details
-                    CronApplicationBuildDetails applicationBuildDetails = new CronApplicationBuildDetails();
-                    applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
-                    DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
-                    applicationBuildDetails.setOutputContext(outputContext);
-                    outputContext.setDockerLogsMaxSizeMB(100);
-                    switch (application.getExecutionPolicy()) {
-                    case ALWAYS_ON:
-                        containersManageContext.getAlwaysRunningApplications().add(applicationBuildDetails);
-                        break;
-                    case CRON:
-                        applicationBuildDetails.setCronTime(application.getExecutionCronDetails());
-                        containersManageContext.getCronApplications().add(applicationBuildDetails);
-                        break;
+                    // Install applications
+                    logger.info("Installing applications");
+                    ContainersManageContext containersManageContext = new ContainersManageContext();
+                    containersManageContext.setDockerState(dockerState);
+                    containersManageContext.setContainerManagementCallback(notFailedCallback);
+                    containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
+                    Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
+                    List<Tuple3<String, String, Integer>> appNameEndpointNameAndPorts = new ArrayList<>();
+                    for (Application application : machineSetup.getApplications()) {
+                        String applicationName = application.getName();
+                        String buildDirectory = imageBuildPath + "/" + applicationName + "/";
+                        DirectoryTools.deleteFolder(buildDirectory);
+
+                        // Associate the application name to all the running users (for docker-sudo)
+                        addIfIdSet(applicationNamesByUnixUserId, application.getApplicationDefinition().getRunAs(), applicationName);
+                        for (IPApplicationDefinitionService service : application.getApplicationDefinition().getServices()) {
+                            addIfIdSet(applicationNamesByUnixUserId, service.getRunAs(), applicationName);
+                        }
+
+                        // Add applications details
+                        CronApplicationBuildDetails applicationBuildDetails = new CronApplicationBuildDetails();
+                        applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
+                        DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
+                        applicationBuildDetails.setOutputContext(outputContext);
+                        outputContext.setDockerLogsMaxSizeMB(100);
+                        switch (application.getExecutionPolicy()) {
+                        case ALWAYS_ON:
+                            containersManageContext.getAlwaysRunningApplications().add(applicationBuildDetails);
+                            break;
+                        case CRON:
+                            applicationBuildDetails.setCronTime(application.getExecutionCronDetails());
+                            containersManageContext.getCronApplications().add(applicationBuildDetails);
+                            break;
+                        }
+
+                        // Keep the exposed ports
+                        application.getApplicationDefinition().getPortsEndpoint().forEach((port, endpoint) -> {
+                            appNameEndpointNameAndPorts.add(new Tuple3<>(applicationName, endpoint, port));
+                        });
                     }
 
-                    // Keep the exposed ports
-                    application.getApplicationDefinition().getPortsEndpoint().forEach((port, endpoint) -> {
-                        appNameEndpointNameAndPorts.add(new Tuple3<>(applicationName, endpoint, port));
-                    });
-                }
+                    dockerUtils.containersManage(containersManageContext);
 
-                dockerUtils.containersManage(containersManageContext);
-
-                // Install docker-sudo configuration
-                logger.info("Install docker-sudo configuration");
-                String dockerSudoConfPath = hostFs + "/etc/docker-sudo/";
-                DirectoryTools.createPath(dockerSudoConfPath, "root", "root", "755");
-                List<String> filesToRemove = new ArrayList<>();
-                for (String file : new File(dockerSudoConfPath).list()) {
-                    filesToRemove.add(file);
-                    filesToRemove.remove("images");
-                }
-
-                for (Long unixUserId : applicationNamesByUnixUserId.keySet()) {
-                    String unixUserName = unixUserNameById.get(unixUserId);
-                    if (unixUserName == null) {
-                        continue;
+                    // Install docker-sudo configuration
+                    logger.info("Install docker-sudo configuration");
+                    String dockerSudoConfPath = hostFs + "/etc/docker-sudo/";
+                    DirectoryTools.createPath(dockerSudoConfPath, "root", "root", "755");
+                    List<String> filesToRemove = new ArrayList<>();
+                    for (String file : new File(dockerSudoConfPath).list()) {
+                        filesToRemove.add(file);
+                        filesToRemove.remove("images");
                     }
 
-                    // Get the config file
-                    String configFileName = "containers-" + unixUserName + ".conf";
-                    String fullConfigPath = dockerSudoConfPath + configFileName;
-                    filesToRemove.remove(configFileName);
+                    for (Long unixUserId : applicationNamesByUnixUserId.keySet()) {
+                        String unixUserName = unixUserNameById.get(unixUserId);
+                        if (unixUserName == null) {
+                            continue;
+                        }
 
-                    // Write information in it
-                    List<String> applicationNames = applicationNamesByUnixUserId.get(unixUserId);
-                    Collections.sort(applicationNames);
-                    logger.info("Saving {} with {} entries", fullConfigPath, applicationNames.size());
-                    FileTools.writeFileWithContentCheck(fullConfigPath, applicationNames);
-                    FileTools.changePermissions(fullConfigPath, false, "644");
-                }
+                        // Get the config file
+                        String configFileName = "containers-" + unixUserName + ".conf";
+                        String fullConfigPath = dockerSudoConfPath + configFileName;
+                        filesToRemove.remove(configFileName);
 
-                for (String fileToRemove : filesToRemove) {
-                    String fullConfigPath = dockerSudoConfPath + fileToRemove;
-                    logger.info("Deleting extra file {}", fullConfigPath);
-                    FileTools.deleteFile(fullConfigPath);
-                }
-
-                // Install docker-sudo images
-                logger.info("Install docker-sudo images");
-                String dockerSudoImagesPath = hostFs + "/etc/docker-sudo/images/";
-                DirectoryTools.createPath(dockerSudoImagesPath, "root", "root", "755");
-                List<Tuple2<String, String>> dockerSudoImages = Arrays.asList( //
-                        new Tuple2<>("mariadb", "mariadb:10.3") //
-                );
-                filesToRemove = new ArrayList<>();
-                for (String file : new File(dockerSudoImagesPath).list()) {
-                    filesToRemove.add(file);
-                }
-                for (Tuple2<String, String> image : dockerSudoImages) {
-                    logger.info("Installing image {} using {}", image.getA(), image.getB());
-                    filesToRemove.remove(image.getA());
-
-                    String fullImagePath = dockerSudoImagesPath + image.getA();
-                    DirectoryTools.createPath(fullImagePath, "root", "root", "755");
-                    FileTools.writeFile("FROM " + image.getB() + "\n", new File(fullImagePath + "/Dockerfile"), "root", "root", "644");
-                }
-
-                for (String fileToRemove : filesToRemove) {
-                    String fullImagePath = dockerSudoImagesPath + fileToRemove;
-                    logger.info("Deleting extra directory {}", fullImagePath);
-                    DirectoryTools.deleteFolder(fullImagePath);
-                }
-
-                // Registry of all exposed services
-                logger.info("Keep a listing of the applications endpoints. Amount: {}", appNameEndpointNameAndPorts.size());
-                filesToRemove.clear();
-                String applicationEndpointsPath = hostFs + "/var/infra-endpoints/";
-                DirectoryTools.createPath(applicationEndpointsPath, "root", "root", "755");
-                for (String file : new File(applicationEndpointsPath).list()) {
-                    filesToRemove.add(file);
-                }
-
-                for (Tuple3<String, String, Integer> appNameEndpointNameAndPort : appNameEndpointNameAndPorts) {
-                    String applicationName = appNameEndpointNameAndPort.getA();
-                    String endpoint = appNameEndpointNameAndPort.getB();
-                    int port = appNameEndpointNameAndPort.getC();
-                    logger.info("Processing {}/{}/{}", applicationName, endpoint, port);
-                    String ip = dockerState.getIpStateByName().get(applicationName).getIp();
-                    if (ip == null) {
-                        logger.info("Skipping {}/{}/{} because we do not know the IP of the app (most likely not running)");
-                        continue;
+                        // Write information in it
+                        List<String> applicationNames = applicationNamesByUnixUserId.get(unixUserId);
+                        Collections.sort(applicationNames);
+                        logger.info("Saving {} with {} entries", fullConfigPath, applicationNames.size());
+                        FileTools.writeFileWithContentCheck(fullConfigPath, applicationNames);
+                        FileTools.changePermissions(fullConfigPath, false, "644");
                     }
 
-                    // Get the config file
-                    String configFileName = applicationName + "_" + endpoint;
-                    String fullConfigPath = applicationEndpointsPath + configFileName;
-                    filesToRemove.remove(configFileName);
+                    for (String fileToRemove : filesToRemove) {
+                        String fullConfigPath = dockerSudoConfPath + fileToRemove;
+                        logger.info("Deleting extra file {}", fullConfigPath);
+                        FileTools.deleteFile(fullConfigPath);
+                    }
 
-                    // Write information in it
-                    String hostPort = ip + ":" + port;
-                    logger.info("Saving {} with content {}", fullConfigPath, hostPort);
-                    FileTools.writeFileWithContentCheck(fullConfigPath, hostPort);
-                    FileTools.changePermissions(fullConfigPath, false, "644");
-                }
+                    // Install docker-sudo images
+                    logger.info("Install docker-sudo images");
+                    String dockerSudoImagesPath = hostFs + "/etc/docker-sudo/images/";
+                    DirectoryTools.createPath(dockerSudoImagesPath, "root", "root", "755");
+                    List<Tuple2<String, String>> dockerSudoImages = Arrays.asList( //
+                            new Tuple2<>("mariadb", "mariadb:10.3") //
+                    );
+                    filesToRemove = new ArrayList<>();
+                    for (String file : new File(dockerSudoImagesPath).list()) {
+                        filesToRemove.add(file);
+                    }
+                    for (Tuple2<String, String> image : dockerSudoImages) {
+                        logger.info("Installing image {} using {}", image.getA(), image.getB());
+                        filesToRemove.remove(image.getA());
 
-                for (String fileToRemove : filesToRemove) {
-                    String fullConfigPath = applicationEndpointsPath + fileToRemove;
-                    logger.info("Deleting extra file {}", fullConfigPath);
-                    FileTools.deleteFile(fullConfigPath);
-                }
+                        String fullImagePath = dockerSudoImagesPath + image.getA();
+                        DirectoryTools.createPath(fullImagePath, "root", "root", "755");
+                        FileTools.writeFile("FROM " + image.getB() + "\n", new File(fullImagePath + "/Dockerfile"), "root", "root", "644");
+                    }
 
-            });
-            timeoutRunnableHandler.run();
-        } catch (Exception e) {
-            logger.error("There was an unexpected exception while applying the machine's setup", e);
-        }
+                    for (String fileToRemove : filesToRemove) {
+                        String fullImagePath = dockerSudoImagesPath + fileToRemove;
+                        logger.info("Deleting extra directory {}", fullImagePath);
+                        DirectoryTools.deleteFolder(fullImagePath);
+                    }
 
-        threadNameStateTool.revert();
+                    // Registry of all exposed services
+                    logger.info("Keep a listing of the applications endpoints. Amount: {}", appNameEndpointNameAndPorts.size());
+                    filesToRemove.clear();
+                    String applicationEndpointsPath = hostFs + "/var/infra-endpoints/";
+                    DirectoryTools.createPath(applicationEndpointsPath, "root", "root", "755");
+                    for (String file : new File(applicationEndpointsPath).list()) {
+                        filesToRemove.add(file);
+                    }
+
+                    for (Tuple3<String, String, Integer> appNameEndpointNameAndPort : appNameEndpointNameAndPorts) {
+                        String applicationName = appNameEndpointNameAndPort.getA();
+                        String endpoint = appNameEndpointNameAndPort.getB();
+                        int port = appNameEndpointNameAndPort.getC();
+                        logger.info("Processing {}/{}/{}", applicationName, endpoint, port);
+                        String ip = dockerState.getIpStateByName().get(applicationName).getIp();
+                        if (ip == null) {
+                            logger.info("Skipping {}/{}/{} because we do not know the IP of the app (most likely not running)");
+                            continue;
+                        }
+
+                        // Get the config file
+                        String configFileName = applicationName + "_" + endpoint;
+                        String fullConfigPath = applicationEndpointsPath + configFileName;
+                        filesToRemove.remove(configFileName);
+
+                        // Write information in it
+                        String hostPort = ip + ":" + port;
+                        logger.info("Saving {} with content {}", fullConfigPath, hostPort);
+                        FileTools.writeFileWithContentCheck(fullConfigPath, hostPort);
+                        FileTools.changePermissions(fullConfigPath, false, "644");
+                    }
+
+                    for (String fileToRemove : filesToRemove) {
+                        String fullConfigPath = applicationEndpointsPath + fileToRemove;
+                        logger.info("Deleting extra file {}", fullConfigPath);
+                        FileTools.deleteFile(fullConfigPath);
+                    }
+
+                });
+                timeoutRunnableHandler.run();
+            } catch (Exception e) {
+                logger.error("There was an unexpected exception while applying the machine's setup", e);
+            }
+
+            threadNameStateTool.revert();
+
+        });
     }
 
     @Override
@@ -378,7 +385,9 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 // Go to the expected state
                 logger.info("Apply state");
                 applyState(dockerState, machineSetup);
-                dbService.dockerStateSave(dockerState);
+                if (dockerState != null) {
+                    dbService.dockerStateSave(dockerState);
+                }
             } catch (Exception e) {
                 logger.error("There was an unexpected exception while looping", e);
             }
