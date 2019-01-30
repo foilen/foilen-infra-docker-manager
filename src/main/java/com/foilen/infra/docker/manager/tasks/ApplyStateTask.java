@@ -217,8 +217,11 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     List<String> filesToRemove = new ArrayList<>();
                     for (String file : new File(dockerSudoConfPath).list()) {
                         filesToRemove.add(file);
-                        filesToRemove.remove("images");
                     }
+                    filesToRemove.remove("images");
+                    filesToRemove.remove("config.json");
+                    FileTools.writeFileWithContentCheck(dockerSudoConfPath + "config.json", "{\"network\" : \"fcloud\"}");
+                    FileTools.changePermissions(dockerSudoConfPath + "config.json", false, "644");
 
                     for (Long unixUserId : applicationNamesByUnixUserId.keySet()) {
                         String unixUserName = unixUserNameById.get(unixUserId);
