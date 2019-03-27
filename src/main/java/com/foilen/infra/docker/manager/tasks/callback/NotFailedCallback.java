@@ -9,12 +9,16 @@
  */
 package com.foilen.infra.docker.manager.tasks.callback;
 
+import java.util.Calendar;
+import java.util.Date;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.foilen.infra.docker.manager.db.services.DbService;
 import com.foilen.infra.plugin.system.utils.callback.DockerContainerManagementCallback;
 import com.foilen.infra.plugin.system.utils.model.DockerStateIds;
+import com.foilen.smalltools.tools.DateTools;
 
 @Component
 public class NotFailedCallback implements DockerContainerManagementCallback {
@@ -24,7 +28,8 @@ public class NotFailedCallback implements DockerContainerManagementCallback {
 
     @Override
     public boolean proceedWithTransformedContainer(String containerName, DockerStateIds dockerStateIds) {
-        return !dbService.failedFindBy(containerName, dockerStateIds).isPresent();
+        Date lastFail = DateTools.addDate(Calendar.MINUTE, -10);
+        return !dbService.failedFindByContainerNameAndDockerStateIdsAndLastFailBefore(containerName, dockerStateIds, lastFail).isPresent();
     }
 
 }

@@ -9,10 +9,12 @@
  */
 package com.foilen.infra.docker.manager.db.services;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
 import com.foilen.infra.plugin.system.utils.model.DockerState;
+import com.foilen.infra.plugin.system.utils.model.DockerStateFailed;
 import com.foilen.infra.plugin.system.utils.model.DockerStateIds;
 
 public interface DbService {
@@ -21,7 +23,7 @@ public interface DbService {
 
     void dockerStateSave(DockerState dockerState);
 
-    Optional<DockerStateIds> failedFindBy(String containerName, DockerStateIds dockerStateIds);
+    Optional<DockerStateFailed> failedFindByContainerNameAndDockerStateIdsAndLastFailBefore(String containerName, DockerStateIds dockerStateIds, Date lastFailBefore);
 
     void unixUserAdd(String username);
 

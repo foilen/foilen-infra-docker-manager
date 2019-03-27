@@ -10,6 +10,7 @@
 package com.foilen.infra.docker.manager.db.services;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,9 +20,9 @@ import org.springframework.stereotype.Service;
 import com.foilen.infra.docker.manager.db.dao.DockerStateDao;
 import com.foilen.infra.docker.manager.db.dao.InstalledUnixUserDao;
 import com.foilen.infra.plugin.system.utils.model.DockerState;
+import com.foilen.infra.plugin.system.utils.model.DockerStateFailed;
 import com.foilen.infra.plugin.system.utils.model.DockerStateIds;
 import com.foilen.smalltools.tools.AbstractBasics;
-import com.foilen.smalltools.tools.StringTools;
 
 @Service
 public class DbServiceImpl extends AbstractBasics implements DbService {
@@ -42,16 +43,15 @@ public class DbServiceImpl extends AbstractBasics implements DbService {
     }
 
     @Override
-    public Optional<DockerStateIds> failedFindBy(String containerName, DockerStateIds dockerStateIds) {
-        DockerStateIds failedDockerStateIds = dockerStateDao.load().getFailedContainersByName().get(containerName);
-        if (failedDockerStateIds == null || //
-                !StringTools.safeEquals(dockerStateIds.getImageUniqueId(), failedDockerStateIds.getImageUniqueId()) || //
-                !StringTools.safeEquals(dockerStateIds.getContainerRunUniqueId(), failedDockerStateIds.getContainerRunUniqueId()) || //
-                !StringTools.safeEquals(dockerStateIds.getContainerStartedUniqueId(), failedDockerStateIds.getContainerStartedUniqueId()) //
-        ) {
+    public Optional<DockerStateFailed> failedFindByContainerNameAndDockerStateIdsAndLastFailBefore(String containerName, DockerStateIds dockerStateIds, Date lastFailBefore) {
+        DockerStateFailed dockerStateFailed = dockerStateDao.load().getFailedContainersByName().get(containerName);
+        logger.info("Failed container state for [{}] : {}", containerName, dockerStateFailed);
+        if (dockerStateFailed == null || //
+                !dockerStateIds.idsEquals(dockerStateFailed.getDockerStateIds()) || //
+                dockerStateFailed.getLastFail().getTime() < lastFailBefore.getTime()) {
             return Optional.empty();
         }
-        return Optional.of(failedDockerStateIds);
+        return Optional.of(dockerStateFailed);
     }
 
     @Override
