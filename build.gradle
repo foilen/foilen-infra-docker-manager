@@ -5,7 +5,7 @@ buildscript {
   }
 }
 plugins {
-    id 'org.springframework.boot' version '1.5.9.RELEASE'
+    id 'org.springframework.boot' version '1.5.19.RELEASE'
 }
 
 apply plugin: 'eclipse'
@@ -46,7 +46,7 @@ dependencies {
 
   // Misc
   compile "args4j:args4j:$argsVersion"
-  compile 'org.freemarker:freemarker:2.3.23'
+  compile 'org.freemarker:freemarker:2.3.28'
 
   // Test
   testCompile 'junit:junit'
@@ -57,5 +57,3 @@ dependencies {
 springBoot {
   mainClass = 'com.foilen.infra.docker.manager.DockerManagerApp'
 }
-
-task wrapper(type: Wrapper) { gradleVersion = '4.7' }
