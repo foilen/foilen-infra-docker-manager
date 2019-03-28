@@ -14,9 +14,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -31,6 +33,7 @@ import com.foilen.infra.api.model.UnixUser;
 import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;
+import com.foilen.infra.docker.manager.services.AlertingService;
 import com.foilen.infra.docker.manager.services.GlobalLockService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
@@ -62,6 +65,8 @@ import com.foilen.smalltools.tuple.Tuple3;
 @Component
 public class ApplyStateTask extends AbstractBasics implements Runnable {
 
+    @Autowired
+    private AlertingService alertingService;
     @Autowired
     private DbService dbService;
     @Autowired
@@ -344,8 +349,12 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
         // Go to the expected state
         logger.info("First run from persisted setup");
+        Set<String> initialFailures = dockerState.getFailedContainersByName().keySet().stream().collect(Collectors.toSet());
         applyState(dockerState, machineSetup);
         dbService.dockerStateSave(dockerState);
+
+        // Send alert for new failures
+        sendAlertForNewFailedContainers(initialFailures, dockerState);
 
         // If InfraUi details not set, quit as a single run
         if (!CollectionsTools.isAllItemNotNullOrEmpty(machineSetup.getUiApiBaseUrl(), machineSetup.getUiApiUserId(), machineSetup.getUiApiUserKey())) {
@@ -387,15 +396,36 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                 // Go to the expected state
                 logger.info("Apply state");
+                if (dockerState == null) {
+                    initialFailures = Collections.emptySet();
+                } else {
+                    initialFailures = dockerState.getFailedContainersByName().keySet().stream().collect(Collectors.toSet());
+                }
                 applyState(dockerState, machineSetup);
                 if (dockerState != null) {
                     dbService.dockerStateSave(dockerState);
+
+                    // Send alert for new failures
+                    sendAlertForNewFailedContainers(initialFailures, dockerState);
                 }
             } catch (Exception e) {
                 logger.error("There was an unexpected exception while looping", e);
             }
         }
 
+    }
+
+    private void sendAlertForNewFailedContainers(Set<String> initialFailures, DockerState dockerState) {
+        dockerState.getFailedContainersByName().keySet().stream() //
+                .filter(it -> !initialFailures.contains(it)) //
+                .sorted() //
+                .forEach(container -> {
+                    try {
+                        alertingService.saveAlert("Failed Container", container + " " + DateTools.formatFull(new Date()));
+                    } catch (Exception e) {
+                        logger.error("Could not send alert", e);
+                    }
+                });
     }
 
     @PostConstruct
