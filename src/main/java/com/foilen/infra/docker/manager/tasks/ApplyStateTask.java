@@ -45,6 +45,7 @@ import com.foilen.infra.plugin.system.utils.impl.UnixUsersAndGroupsUtilsImpl;
 import com.foilen.infra.plugin.system.utils.model.ContainersManageContext;
 import com.foilen.infra.plugin.system.utils.model.CronApplicationBuildDetails;
 import com.foilen.infra.plugin.system.utils.model.DockerState;
+import com.foilen.infra.plugin.system.utils.model.DockerStateIp;
 import com.foilen.infra.plugin.system.utils.model.UnixUserDetail;
 import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionService;
 import com.foilen.infra.plugin.v1.model.outputter.docker.DockerContainerOutputContext;
@@ -172,6 +173,25 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                     }
 
+                    // Update the container's IPs with the current values
+                    logger.info("Update the container's IPs with the current values");
+                    Map<String, DockerStateIp> ipStateByName = dockerState.getIpStateByName();
+                    dockerUtils.networkListIpByContainerName(DockerUtilsImpl.NETWORK_NAME).entrySet().forEach(entry -> {
+                        String containerName = entry.getKey();
+                        String ip = entry.getValue();
+
+                        String previousIp = null;
+                        DockerStateIp previous = ipStateByName.get(containerName);
+                        if (previous != null) {
+                            previousIp = previous.getIp();
+                        }
+
+                        if (!StringTools.safeEquals(ip, previousIp)) {
+                            logger.info("Updating IP from network. {} -> {}", containerName, ip);
+                            ipStateByName.put(containerName, new DockerStateIp().setIp(ip).setLastUsed(new Date()));
+                        }
+                    });
+
                     // Install applications
                     logger.info("Installing applications");
                     ContainersManageContext containersManageContext = new ContainersManageContext();
@@ -213,6 +233,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         });
                     }
 
+                    // Build and start applications
                     dockerUtils.containersManage(containersManageContext);
 
                     // Install docker-sudo configuration
