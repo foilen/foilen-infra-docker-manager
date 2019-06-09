@@ -40,4 +40,12 @@ public class DockerStateDaoImpl extends AbstractSingleJsonFileDao<DockerState> i
         return DockerState.class;
     }
 
+    public void setFile(File file) {
+        this.file = file;
+    }
+
+    public void setStagingFile(File stagingFile) {
+        this.stagingFile = stagingFile;
+    }
+
 }

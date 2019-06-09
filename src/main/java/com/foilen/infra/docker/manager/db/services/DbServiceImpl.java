@@ -54,6 +54,14 @@ public class DbServiceImpl extends AbstractBasics implements DbService {
         return Optional.of(dockerStateFailed);
     }
 
+    public void setDockerStateDao(DockerStateDao dockerStateDao) {
+        this.dockerStateDao = dockerStateDao;
+    }
+
+    public void setInstalledUnixUserDao(InstalledUnixUserDao installedUnixUserDao) {
+        this.installedUnixUserDao = installedUnixUserDao;
+    }
+
     @Override
     public void unixUserAdd(String username) {
         installedUnixUserDao.add(username);

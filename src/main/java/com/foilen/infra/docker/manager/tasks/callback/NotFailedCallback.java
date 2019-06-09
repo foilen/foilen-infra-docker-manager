@@ -32,4 +32,8 @@ public class NotFailedCallback implements DockerContainerManagementCallback {
         return !dbService.failedFindByContainerNameAndDockerStateIdsAndLastFailBefore(containerName, dockerStateIds, lastFail).isPresent();
     }
 
+    public void setDbService(DbService dbService) {
+        this.dbService = dbService;
+    }
+
 }
