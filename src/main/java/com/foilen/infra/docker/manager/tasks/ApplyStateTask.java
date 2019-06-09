@@ -428,6 +428,8 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                     // Send alert for new failures
                     sendAlertForNewFailedContainers(initialFailures, dockerState);
+                    // Send alert for no more failures
+                    sendAlertForNoMoreFailedContainers(initialFailures, dockerState);
                 }
             } catch (Exception e) {
                 logger.error("There was an unexpected exception while looping", e);
@@ -443,6 +445,19 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 .forEach(container -> {
                     try {
                         alertingService.saveAlert("Failed Container", container + " " + DateTools.formatFull(new Date()));
+                    } catch (Exception e) {
+                        logger.error("Could not send alert", e);
+                    }
+                });
+    }
+
+    private void sendAlertForNoMoreFailedContainers(Set<String> initialFailures, DockerState dockerState) {
+        initialFailures.stream() //
+                .filter(it -> !dockerState.getFailedContainersByName().containsKey(it)) //
+                .sorted() //
+                .forEach(container -> {
+                    try {
+                        alertingService.saveAlert("Fixed Container", container + " " + DateTools.formatFull(new Date()) + " successfully started");
                     } catch (Exception e) {
                         logger.error("Could not send alert", e);
                     }
