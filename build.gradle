@@ -50,10 +50,17 @@ dependencies {
   compile 'org.freemarker:freemarker:2.3.28'
 
   // Test
-  testCompile 'junit:junit'
+  testCompileOnly 'junit:junit'
+  testImplementation "org.junit.jupiter:junit-jupiter-api:$junitVersion"
+  testRuntimeOnly "org.junit.vintage:junit-vintage-engine:$junitVersion"
   testCompile "org.springframework:spring-test"
   testCompile "org.springframework.boot:spring-boot-starter-test"
 }
+
+test {
+  useJUnitPlatform()
+}
+
 
 springBoot {
   mainClass = 'com.foilen.infra.docker.manager.DockerManagerApp'

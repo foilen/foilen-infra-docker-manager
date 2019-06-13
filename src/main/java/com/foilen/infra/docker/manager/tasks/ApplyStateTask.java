@@ -16,8 +16,10 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -66,6 +68,53 @@ import com.foilen.smalltools.tuple.Tuple3;
 @Component
 public class ApplyStateTask extends AbstractBasics implements Runnable {
 
+    /**
+     * Remove all IPs not seen for 2 days and duplicate IPs (keep most recent).
+     *
+     * @param ipStateByName
+     *            the ips
+     */
+    protected static void cleanupIps(Map<String, DockerStateIp> ipStateByName) {
+
+        Date old = DateTools.addDate(Calendar.DAY_OF_YEAR, -2);
+        Map<String, Date> lastSeenByIp = new HashMap<>();
+        Map<String, String> lastContainerByIp = new HashMap<>();
+
+        List<String> removeContainers = new ArrayList<>();
+
+        Iterator<Entry<String, DockerStateIp>> it = ipStateByName.entrySet().iterator();
+        while (it.hasNext()) {
+            Entry<String, DockerStateIp> next = it.next();
+            String containerName = next.getKey();
+            DockerStateIp dockerStateIp = next.getValue();
+            String ip = dockerStateIp.getIp();
+            Date lastUsed = dockerStateIp.getLastUsed();
+
+            // Check if expired
+            if (DateTools.isBefore(lastUsed, old)) {
+                it.remove();
+            } else {
+                // Check if duplicate
+                Date previousLastUsed = lastSeenByIp.get(ip);
+                if (previousLastUsed != null) {
+                    if (DateTools.isBefore(previousLastUsed, lastUsed)) {
+                        // Keep new
+                        lastSeenByIp.put(ip, lastUsed);
+                        String oldContainerName = lastContainerByIp.put(ip, containerName);
+                        removeContainers.add(oldContainerName);
+                    } else {
+                        // Keep old
+                        it.remove();
+                    }
+                } else {
+                    lastSeenByIp.put(ip, lastUsed);
+                    lastContainerByIp.put(ip, containerName);
+                }
+            }
+        }
+        removeContainers.forEach(containerName -> ipStateByName.remove(containerName));
+    }
+
     @Autowired
     private AlertingService alertingService;
     @Autowired
@@ -76,17 +125,18 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     private InfraUiApiClientManagementService infraUiApiClientManagementService;
     @Autowired
     private NotFailedCallback notFailedCallback;
+
     @Autowired
     private SaveTransformedApplicationDefinitionCallback saveTransformedApplicationDefinitionCallback;
-
     @Value("${dockerManager.persistedConfigPath}")
     private String persistedConfigPath;
+
     @Value("${dockerManager.imageBuildPath}")
     private String imageBuildPath;
 
     private String hostFs = SystemTools.getPropertyOrEnvironment("HOSTFS", "/");
-
     private DockerUtils dockerUtils = new DockerUtilsImpl();
+
     private UnixUsersAndGroupsUtils unixUsersAndGroupsUtils = new UnixUsersAndGroupsUtilsImpl();
 
     private void addIfIdSet(Map<Long, List<String>> applicationNamesByUnixUserId, Long unixUserId, String applicationName) {
@@ -186,11 +236,16 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                             previousIp = previous.getIp();
                         }
 
-                        if (!StringTools.safeEquals(ip, previousIp)) {
+                        if (StringTools.safeEquals(ip, previousIp)) {
+                            logger.info("Refreshing last used date for {} -> {}", containerName, ip);
+                            previous.setLastUsed(new Date());
+                        } else {
                             logger.info("Updating IP from network. {} -> {}", containerName, ip);
                             ipStateByName.put(containerName, new DockerStateIp().setIp(ip).setLastUsed(new Date()));
                         }
                     });
+
+                    cleanupIps(dockerState.getIpStateByName());
 
                     // Install applications
                     logger.info("Installing applications");
