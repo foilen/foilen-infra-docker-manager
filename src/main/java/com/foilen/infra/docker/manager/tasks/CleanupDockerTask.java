@@ -24,6 +24,7 @@ public class CleanupDockerTask extends AbstractBasics {
     @Autowired
     private GlobalLockService globalLockService;
 
+    // Once per 2 hours
     @Scheduled(cron = "33 33 */2 * * *")
     public void cleanupDocker() {
 
