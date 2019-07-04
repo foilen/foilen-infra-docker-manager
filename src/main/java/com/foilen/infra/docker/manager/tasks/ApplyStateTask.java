@@ -58,6 +58,7 @@ import com.foilen.smalltools.tools.DateTools;
 import com.foilen.smalltools.tools.DirectoryTools;
 import com.foilen.smalltools.tools.FileTools;
 import com.foilen.smalltools.tools.JsonTools;
+import com.foilen.smalltools.tools.SecureRandomTools;
 import com.foilen.smalltools.tools.StringTools;
 import com.foilen.smalltools.tools.SystemTools;
 import com.foilen.smalltools.tools.ThreadNameStateTool;
@@ -396,7 +397,13 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                 });
                 timeoutRunnableHandler.run();
             } catch (Exception e) {
-                logger.error("There was an unexpected exception while applying the machine's setup", e);
+                String uniqueId = SecureRandomTools.randomHexString(10);
+                logger.error("There was an unexpected exception while applying the machine's setup. Unique id: {}", uniqueId, e);
+                try {
+                    alertingService.saveAlert("There was an unexpected exception while applying the machine's setup", uniqueId + " " + e.getClass() + " " + e.getMessage());
+                } catch (Exception e1) {
+                    logger.error("Could not send alert", e1);
+                }
             }
 
             threadNameStateTool.revert();
@@ -487,7 +494,13 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     sendAlertForNoMoreFailedContainers(initialFailures, dockerState);
                 }
             } catch (Exception e) {
-                logger.error("There was an unexpected exception while looping", e);
+                String uniqueId = SecureRandomTools.randomHexString(10);
+                logger.error("There was an unexpected exception while looping. Unique id: {}", uniqueId, e);
+                try {
+                    alertingService.saveAlert("There was an unexpected exception while looping", uniqueId + " " + e.getClass() + " " + e.getMessage());
+                } catch (Exception e1) {
+                    logger.error("Could not send alert", e1);
+                }
             }
         }
 
