@@ -175,23 +175,6 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                     currentThreadNameStateTool.change();
 
-                    // Remove unused unix users
-                    logger.info("Removing unneeded unix users");
-                    List<String> neededUnixUsers = machineSetup.getUnixUsers().stream() //
-                            .map(UnixUser::getName) //
-                            .sorted() //
-                            .collect(Collectors.toList());
-                    List<String> toDeleteUnixUsers = dbService.unixUserFindAllNotNeeded(neededUnixUsers);
-                    for (String toDeleteUnixUser : toDeleteUnixUsers) {
-                        logger.info("UnixUser to delete: {}", toDeleteUnixUser);
-                        UnixUserDetail toDeleteUnixUserDetails = unixUsersAndGroupsUtils.userGet(toDeleteUnixUser);
-                        if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName(), toDeleteUnixUserDetails.getHomeFolder())) {
-                            dbService.unixUserDelete(toDeleteUnixUser);
-                        } else {
-                            logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
-                        }
-                    }
-
                     // Install unix users
                     logger.info("Installing unix users");
                     Map<Long, String> unixUserNameById = new HashMap<>();
@@ -392,6 +375,23 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         String fullConfigPath = applicationEndpointsPath + fileToRemove;
                         logger.info("Deleting extra file {}", fullConfigPath);
                         FileTools.deleteFile(fullConfigPath);
+                    }
+
+                    // Remove unused unix users
+                    logger.info("Removing unneeded unix users");
+                    List<String> neededUnixUsers = machineSetup.getUnixUsers().stream() //
+                            .map(UnixUser::getName) //
+                            .sorted() //
+                            .collect(Collectors.toList());
+                    List<String> toDeleteUnixUsers = dbService.unixUserFindAllNotNeeded(neededUnixUsers);
+                    for (String toDeleteUnixUser : toDeleteUnixUsers) {
+                        logger.info("UnixUser to delete: {}", toDeleteUnixUser);
+                        UnixUserDetail toDeleteUnixUserDetails = unixUsersAndGroupsUtils.userGet(toDeleteUnixUser);
+                        if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName(), toDeleteUnixUserDetails.getHomeFolder())) {
+                            dbService.unixUserDelete(toDeleteUnixUser);
+                        } else {
+                            logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
+                        }
                     }
 
                 });
