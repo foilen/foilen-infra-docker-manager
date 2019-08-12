@@ -426,12 +426,15 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
         MachineSetup machineSetup = JsonTools.readFromFile(machineSetupFile, MachineSetup.class);
         infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
 
+        // Get the new machineSetup or use the local one
+        machineSetup = updateMachineSetup(machineSetupFile);
+
         // Get the previous DockerState
         DockerState dockerState = dbService.dockerStateLoad();
         updateRedirectionDetails(machineSetup, dockerState);
 
         // Go to the expected state
-        logger.info("First run from persisted setup");
+        logger.info("First run");
         Set<String> initialFailures = dockerState.getFailedContainersByName().keySet().stream().collect(Collectors.toSet());
         applyState(dockerState, machineSetup);
         dbService.dockerStateSave(dockerState);
@@ -458,24 +461,8 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     continue;
                 }
 
-                try {
-                    ResponseMachineSetup responseMachineSetup = infraApiService.getInfraMachineApiService().getMachineSetup(machineSetup.getMachineName());
-                    if (responseMachineSetup.isSuccess()) {
-                        machineSetup = responseMachineSetup.getItem();
-                    } else {
-                        logger.error("Could not retrieve the machine setup. Will use persisted one. Error: {}", responseMachineSetup.getError());
-                    }
-                } catch (Exception e) {
-                    logger.error("Could not retrieve the machine setup. Will use persisted one.", e);
-                }
-
-                infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
+                machineSetup = updateMachineSetup(machineSetupFile);
                 updateRedirectionDetails(machineSetup, dockerState);
-                if (machineSetup != null) {
-                    JsonTools.writeToFile(machineSetupFile + "-tmp", machineSetup);
-                    FileTools.deleteFile(machineSetupFile);
-                    new File(machineSetupFile + "-tmp").renameTo(new File(machineSetupFile));
-                }
 
                 // Go to the expected state
                 logger.info("Apply state");
@@ -535,6 +522,44 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     @PostConstruct
     public void startThread() {
         new Thread(this).start();
+    }
+
+    private MachineSetup updateMachineSetup(String machineSetupFile) {
+
+        // Get the persisted one
+        logger.info("Get the config from the disk");
+        MachineSetup machineSetup = JsonTools.readFromFile(machineSetupFile, MachineSetup.class);
+        if (machineSetup != null) {
+            logger.info("Update the API client details if needed");
+            infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
+        }
+
+        // Retrieve the remote one
+        InfraApiService infraApiService = infraUiApiClientManagementService.getInfraApiService();
+        if (infraApiService != null) {
+            logger.info("Get the latest config from the UI if possible");
+            try {
+                ResponseMachineSetup responseMachineSetup = infraApiService.getInfraMachineApiService().getMachineSetup(machineSetup.getMachineName());
+                if (responseMachineSetup.isSuccess()) {
+                    machineSetup = responseMachineSetup.getItem();
+
+                    if (machineSetup != null) {
+                        logger.info("Save the retrieved machine setup");
+                        JsonTools.writeToFile(machineSetupFile + "-tmp", machineSetup);
+                        FileTools.deleteFile(machineSetupFile);
+                        new File(machineSetupFile + "-tmp").renameTo(new File(machineSetupFile));
+
+                        logger.info("Update the API client details if needed");
+                        infraUiApiClientManagementService.updateClientDetailsIfNeeded(machineSetup);
+                    }
+                } else {
+                    logger.error("Could not retrieve the machine setup. Will use persisted one. Error: {}", responseMachineSetup.getError());
+                }
+            } catch (Exception e) {
+                logger.error("Could not retrieve the machine setup. Will use persisted one.", e);
+            }
+        }
+        return machineSetup;
     }
 
     private void updateRedirectionDetails(MachineSetup machineSetup, DockerState dockerState) {
