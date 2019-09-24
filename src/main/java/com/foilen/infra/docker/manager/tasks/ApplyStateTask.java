@@ -237,12 +237,17 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     containersManageContext.setDockerState(dockerState);
                     containersManageContext.setContainerManagementCallback(notFailedCallback);
                     containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
+                    String stagingDirectory = imageBuildPath + "/staging";
+                    String runningDirectory = imageBuildPath + "/running";
+                    DirectoryTools.deleteFolder(stagingDirectory);
+                    DirectoryTools.createPath(stagingDirectory);
+                    DirectoryTools.createPath(runningDirectory);
+                    containersManageContext.setBaseOutputDirectory(stagingDirectory);
                     Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
                     List<Tuple3<String, String, Integer>> appNameEndpointNameAndPorts = new ArrayList<>();
                     for (Application application : machineSetup.getApplications()) {
                         String applicationName = application.getName();
-                        String buildDirectory = imageBuildPath + "/" + applicationName + "/";
-                        DirectoryTools.deleteFolder(buildDirectory);
+                        String buildDirectory = stagingDirectory + "/" + applicationName + "/";
 
                         // Associate the application name to all the running users (for docker-sudo)
                         addIfIdSet(applicationNamesByUnixUserId, application.getApplicationDefinition().getRunAs(), applicationName);
@@ -391,6 +396,27 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                             dbService.unixUserDelete(toDeleteUnixUser);
                         } else {
                             logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
+                        }
+                    }
+
+                    // Update the running images directory
+                    logger.info("Update the running images directory");
+                    List<String> couldBeRunning = new ArrayList<>();
+                    couldBeRunning.addAll(dockerState.getRunningContainersByName().keySet());
+                    for (File runningApp : new File(runningDirectory).listFiles()) {
+                        if (!couldBeRunning.contains(runningApp.getName())) {
+                            logger.info("Removing {}", runningApp.getAbsolutePath());
+                            DirectoryTools.deleteFolder(runningApp);
+                        }
+                    }
+                    couldBeRunning.removeAll(dockerState.getFailedContainersByName().keySet());
+                    for (String appToCopy : couldBeRunning) {
+                        File stagingAppDirectory = new File(stagingDirectory + "/" + appToCopy);
+                        File runningAppDirectory = new File(runningDirectory + "/" + appToCopy);
+                        if (stagingAppDirectory.exists()) {
+                            logger.info("Moving {} to {}", stagingAppDirectory.getAbsolutePath(), runningAppDirectory.getAbsolutePath());
+                            DirectoryTools.deleteFolder(runningAppDirectory);
+                            stagingAppDirectory.renameTo(runningAppDirectory);
                         }
                     }
 
