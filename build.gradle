@@ -5,11 +5,12 @@ buildscript {
   }
 }
 plugins {
-    id 'org.springframework.boot' version '1.5.19.RELEASE'
+    id 'org.springframework.boot' version '2.2.2.RELEASE'
 }
 
 apply plugin: 'eclipse'
 apply plugin: 'java'
+apply plugin: 'io.spring.dependency-management'
 
 group = 'com.foilen'
 version = System.getenv('VERSION')?:'master-SNAPSHOT'
@@ -20,17 +21,13 @@ repositories {
   mavenCentral()
 }
 
-sourceCompatibility = 1.11
+sourceCompatibility = 11
 
 eclipse {
   classpath {
     downloadSources = true
     downloadJavadoc = true
   }
-}
-
-configurations {
-	testCompile.extendsFrom compileOnly
 }
 
 dependencies {
@@ -46,7 +43,7 @@ dependencies {
 
   // Misc
   compile "args4j:args4j:$argsVersion"
-  compile 'com.foilen:jl-smalltools:0.46.5'
+  compile "com.foilen:jl-smalltools:$smalltoolsVersion"
   compile "javax.xml.bind:jaxb-api:2.3.1"
   compile 'org.freemarker:freemarker:2.3.28'
 
@@ -62,7 +59,12 @@ test {
   useJUnitPlatform()
 }
 
+apply plugin: 'application'
+mainClassName = 'com.foilen.infra.docker.manager.DockerManagerApp'
+jar {
+  enabled = true
+}
 
-springBoot {
-  mainClass = 'com.foilen.infra.docker.manager.DockerManagerApp'
+bootJar {
+ classifier = 'boot'
 }

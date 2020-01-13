@@ -11,7 +11,7 @@ DOCKER_BUILD=$RUN_PATH/build/docker
 rm -rf $DOCKER_BUILD
 mkdir -p $DOCKER_BUILD/app
 
-cp -v build/libs/foilen-infra-docker-manager-$VERSION.jar $DOCKER_BUILD/app/foilen-infra-docker-manager.jar
+cp -v build/libs/foilen-infra-docker-manager-$VERSION-boot.jar $DOCKER_BUILD/app/foilen-infra-docker-manager.jar
 cp -v docker-release/* $DOCKER_BUILD
 echo -n $VERSION > $DOCKER_BUILD/app/version.txt
 
