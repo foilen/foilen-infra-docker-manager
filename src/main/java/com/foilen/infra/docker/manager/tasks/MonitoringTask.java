@@ -13,12 +13,14 @@ import java.io.File;
 import java.io.OutputStream;
 import java.net.ConnectException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
 
@@ -96,37 +98,39 @@ public class MonitoringTask extends AbstractBasics {
             }
 
             // Get max 50 files
-            List<File> files = Files.list(systemStatFolder.toPath()) //
-                    .map(it -> it.toFile()) //
-                    .filter(it -> it.isFile()) //
-                    .filter(it -> it.getName().endsWith(".json")) //
-                    .limit(50) //
-                    .collect(Collectors.toList());
+            try (Stream<Path> fileStream = Files.list(systemStatFolder.toPath())) {
+                List<File> files = fileStream //
+                        .map(it -> it.toFile()) //
+                        .filter(it -> it.isFile()) //
+                        .filter(it -> it.getName().endsWith(".json")) //
+                        .limit(50) //
+                        .collect(Collectors.toList());
 
-            if (files.isEmpty()) {
-                logger.info("No stats to send");
-                return;
-            }
-
-            // Get the stats
-            List<SystemStats> systemStatsList = new ArrayList<>();
-            for (File file : files) {
-                try {
-                    systemStatsList.add(JsonTools.readFromFile(file, SystemStats.class));
-                } catch (Exception e) {
-                    logger.warn("There was a problem getting one stat", e);
+                if (files.isEmpty()) {
+                    logger.info("No stats to send");
+                    return;
                 }
+
+                // Get the stats
+                List<SystemStats> systemStatsList = new ArrayList<>();
+                for (File file : files) {
+                    try {
+                        systemStatsList.add(JsonTools.readFromFile(file, SystemStats.class));
+                    } catch (Exception e) {
+                        logger.warn("There was a problem getting one stat", e);
+                    }
+                }
+
+                // Send them
+                infraApiService.getInfraMachineApiService().sendSystemStats(machineName, systemStatsList);
+
+                // Delete them
+                for (File file : files) {
+                    file.delete();
+                }
+
+                logger.info("Completed send system stats");
             }
-
-            // Send them
-            infraApiService.getInfraMachineApiService().sendSystemStats(machineName, systemStatsList);
-
-            // Delete them
-            for (File file : files) {
-                file.delete();
-            }
-
-            logger.info("Completed send system stats");
 
         } catch (Exception e) {
             if (e instanceof ConnectException) {

@@ -12,8 +12,10 @@ package com.foilen.infra.docker.manager.tasks;
 import java.io.File;
 import java.net.ConnectException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.stream.Stream;
 
 import javax.annotation.PostConstruct;
 
@@ -66,28 +68,30 @@ public class AlertingTask extends AbstractBasics {
             }
 
             // Process max 50 files
-            Files.list(alertDirectory.toPath()) //
-                    .map(it -> it.toFile()) //
-                    .filter(it -> it.isFile()) //
-                    .filter(it -> it.getName().endsWith(".json")) //
-                    .limit(50) //
-                    .forEach(file -> {
-                        // Get it
-                        Alert alert;
-                        try {
-                            alert = JsonTools.readFromFile(file, Alert.class);
-                        } catch (Exception e) {
-                            logger.warn("There was a problem getting one alert", e);
-                            return;
-                        }
+            try (Stream<Path> fileStream = Files.list(alertDirectory.toPath())) {
+                fileStream //
+                        .map(it -> it.toFile()) //
+                        .filter(it -> it.isFile()) //
+                        .filter(it -> it.getName().endsWith(".json")) //
+                        .limit(50) //
+                        .forEach(file -> {
+                            // Get it
+                            Alert alert;
+                            try {
+                                alert = JsonTools.readFromFile(file, Alert.class);
+                            } catch (Exception e) {
+                                logger.warn("There was a problem getting one alert", e);
+                                return;
+                            }
 
-                        // Send it
-                        logger.info("Sending alert {}", alert);
-                        infraApiService.getInfraAlertApiService().sendAlert(alert.getSubjet(), alert.getContent());
+                            // Send it
+                            logger.info("Sending alert {}", alert);
+                            infraApiService.getInfraAlertApiService().sendAlert(alert.getSubjet(), alert.getContent());
 
-                        // Delete it
-                        file.delete();
-                    });
+                            // Delete it
+                            file.delete();
+                        });
+            }
 
         } catch (Exception e) {
             if (e instanceof ConnectException) {
