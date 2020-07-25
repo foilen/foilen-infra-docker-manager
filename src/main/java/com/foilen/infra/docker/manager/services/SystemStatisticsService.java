@@ -9,7 +9,7 @@
  */
 package com.foilen.infra.docker.manager.services;
 
-import com.foilen.infra.api.model.SystemStats;
+import com.foilen.infra.api.model.machine.SystemStats;
 
 /**
  * To retrieve all the statistics from the system.

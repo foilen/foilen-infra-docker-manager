@@ -29,9 +29,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import com.foilen.infra.api.model.Application;
-import com.foilen.infra.api.model.MachineSetup;
-import com.foilen.infra.api.model.UnixUser;
+import com.foilen.infra.api.model.machine.Application;
+import com.foilen.infra.api.model.machine.MachineSetup;
+import com.foilen.infra.api.model.machine.UnixUser;
 import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;

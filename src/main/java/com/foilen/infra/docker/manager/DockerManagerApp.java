@@ -24,7 +24,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.web.context.support.StandardServletEnvironment;
 
-import com.foilen.infra.api.model.MachineSetup;
+import com.foilen.infra.api.model.machine.MachineSetup;
 import com.foilen.infra.docker.manager.configspring.DockerManagerSpringConfig;
 import com.foilen.smalltools.JavaEnvironmentValues;
 import com.foilen.smalltools.tools.DirectoryTools;

@@ -11,7 +11,7 @@ package com.foilen.infra.docker.manager.services;
 
 import org.springframework.stereotype.Component;
 
-import com.foilen.infra.api.model.MachineSetup;
+import com.foilen.infra.api.model.machine.MachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.api.service.InfraApiServiceImpl;
 import com.foilen.smalltools.tools.AbstractBasics;

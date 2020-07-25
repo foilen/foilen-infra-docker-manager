@@ -14,8 +14,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.foilen.infra.api.model.DiskStat;
-import com.foilen.infra.api.model.SystemStats;
+import com.foilen.infra.api.model.machine.DiskStat;
+import com.foilen.infra.api.model.machine.SystemStats;
 import com.foilen.smalltools.systemusage.FileSystemUsage;
 import com.foilen.smalltools.systemusage.FileSystemUsage.FileSystemInfo;
 import com.foilen.smalltools.systemusage.ProcUsage;

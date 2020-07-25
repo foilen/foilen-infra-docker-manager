@@ -9,7 +9,7 @@
  */
 package com.foilen.infra.docker.manager.services;
 
-import com.foilen.infra.api.model.MachineSetup;
+import com.foilen.infra.api.model.machine.MachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 
 public interface InfraUiApiClientManagementService {
