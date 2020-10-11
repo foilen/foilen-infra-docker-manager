@@ -37,6 +37,7 @@ import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;
 import com.foilen.infra.docker.manager.services.AlertingService;
 import com.foilen.infra.docker.manager.services.GlobalLockService;
+import com.foilen.infra.docker.manager.services.InfraAppsService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
 import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
 import com.foilen.infra.docker.manager.tasks.callback.SaveTransformedApplicationDefinitionCallback;
@@ -50,6 +51,7 @@ import com.foilen.infra.plugin.system.utils.model.DockerState;
 import com.foilen.infra.plugin.system.utils.model.DockerStateIp;
 import com.foilen.infra.plugin.system.utils.model.UnixUserDetail;
 import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionService;
+import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionVolume;
 import com.foilen.infra.plugin.v1.model.outputter.docker.DockerContainerOutputContext;
 import com.foilen.smalltools.TimeoutRunnableHandler;
 import com.foilen.smalltools.tools.AbstractBasics;
@@ -122,6 +124,8 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     private DbService dbService;
     @Autowired
     private GlobalLockService globalLockService;
+    @Autowired
+    private InfraAppsService infraAppsService;
     @Autowired
     private InfraUiApiClientManagementService infraUiApiClientManagementService;
     @Autowired
@@ -259,6 +263,9 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         CronApplicationBuildDetails applicationBuildDetails = new CronApplicationBuildDetails();
                         applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
                         DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
+                        outputContext.setHaProxyCommand("/_infra-apps/" + infraAppsService.getName("haproxy"));
+                        outputContext.setServicesExecuteCommand("/_infra-apps/" + infraAppsService.getName("services-execution"));
+                        outputContext.getInfraVolumes().add(new IPApplicationDefinitionVolume("/var/infra-apps/", "/_infra-apps", 0L, 0L, "555", true));
                         applicationBuildDetails.setOutputContext(outputContext);
                         outputContext.setDockerLogsMaxSizeMB(100);
                         switch (application.getExecutionPolicy()) {
