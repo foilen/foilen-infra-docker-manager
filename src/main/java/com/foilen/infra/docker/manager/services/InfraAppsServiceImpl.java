@@ -66,10 +66,11 @@ public class InfraAppsServiceImpl extends AbstractBasics implements InfraAppsSer
 
     @PostConstruct
     public void copyFiles() {
-        copy("/usr/sbin/haproxy");
-        copy("/usr/sbin/services-execution");
 
         DirectoryTools.createPath(INFRA_APPLICATION_PATH, "root", "root", "755");
+
+        copy("/usr/sbin/haproxy");
+        copy("/usr/sbin/services-execution");
 
         ExecutorsTools.getCachedDaemonThreadPool().submit(() -> {
 
