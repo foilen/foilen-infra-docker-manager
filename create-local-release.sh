@@ -10,7 +10,7 @@ RUN_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $RUN_PATH
 
 if [ -z "$VERSION" ]; then
-	export VERSION=$(git rev-parse --abbrev-ref HEAD)-SNAPSHOT
+    export VERSION=$(git rev-parse --abbrev-ref HEAD)-SNAPSHOT
 fi
 
 ./step-update-copyrights.sh
