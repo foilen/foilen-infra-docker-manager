@@ -30,8 +30,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.foilen.infra.api.model.machine.Application;
+import com.foilen.infra.api.model.machine.CronJob;
 import com.foilen.infra.api.model.machine.MachineSetup;
 import com.foilen.infra.api.model.machine.UnixUser;
+import com.foilen.infra.api.model.machine.model.IPApplicationDefinitionService;
 import com.foilen.infra.api.response.ResponseMachineSetup;
 import com.foilen.infra.api.service.InfraApiService;
 import com.foilen.infra.docker.manager.db.services.DbService;
@@ -50,7 +52,7 @@ import com.foilen.infra.plugin.system.utils.model.CronApplicationBuildDetails;
 import com.foilen.infra.plugin.system.utils.model.DockerState;
 import com.foilen.infra.plugin.system.utils.model.DockerStateIp;
 import com.foilen.infra.plugin.system.utils.model.UnixUserDetail;
-import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionService;
+import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinition;
 import com.foilen.infra.plugin.v1.model.base.IPApplicationDefinitionVolume;
 import com.foilen.infra.plugin.v1.model.outputter.docker.DockerContainerOutputContext;
 import com.foilen.smalltools.TimeoutRunnableHandler;
@@ -243,9 +245,11 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
                     String stagingDirectory = imageBuildPath + "/staging";
                     String runningDirectory = imageBuildPath + "/running";
+                    String failingDirectory = imageBuildPath + "/failing";
                     DirectoryTools.deleteFolder(stagingDirectory);
                     DirectoryTools.createPath(stagingDirectory);
                     DirectoryTools.createPath(runningDirectory);
+                    DirectoryTools.createPath(failingDirectory);
                     containersManageContext.setBaseOutputDirectory(stagingDirectory);
                     Map<Long, List<String>> applicationNamesByUnixUserId = new HashMap<>();
                     List<Tuple3<String, String, Integer>> appNameEndpointNameAndPorts = new ArrayList<>();
@@ -261,7 +265,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                         // Add applications details
                         CronApplicationBuildDetails applicationBuildDetails = new CronApplicationBuildDetails();
-                        applicationBuildDetails.setApplicationDefinition(application.getApplicationDefinition());
+                        applicationBuildDetails.setApplicationDefinition(JsonTools.clone(application.getApplicationDefinition(), IPApplicationDefinition.class));
                         DockerContainerOutputContext outputContext = new DockerContainerOutputContext(applicationName, applicationName, applicationName, buildDirectory);
                         outputContext.setHaProxyCommand("/_infra-apps/" + infraAppsService.getName("haproxy"));
                         outputContext.setServicesExecuteCommand("/_infra-apps/" + infraAppsService.getName("services-execution"));
@@ -286,6 +290,47 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                     // Build and start applications
                     dockerUtils.containersManage(containersManageContext);
+
+                    // Install cron jobs
+                    logger.info("Installing cron jobs");
+                    List<String> cronEntries = new ArrayList<>();
+                    List<String> cronJobScriptNames = new ArrayList<>();
+                    for (CronJob cronJob : machineSetup.getCronJobs()) {
+
+                        String scriptPath = hostFs + "/var/infra-crons/";
+                        DirectoryTools.createPath(scriptPath, "root", "root", "755");
+
+                        List<String> contentLines = new ArrayList<>();
+                        contentLines.add("#!/bin/bash");
+                        if (cronJob.getWorkingDirectory() == null) {
+                            contentLines.add("/usr/bin/docker exec -i " //
+                                    + "--user " + cronJob.getRunAs().getName() + " " //
+                                    + cronJob.getApplicationName() + " " + cronJob.getCommand() //
+                            );
+                        } else {
+                            contentLines.add("/usr/bin/docker exec -i " //
+                                    + "--workdir '" + cronJob.getWorkingDirectory() + "' " //
+                                    + "--user " + cronJob.getRunAs().getId() + " " //
+                                    + cronJob.getApplicationName() + " " + cronJob.getCommand() //
+                            );
+                        }
+                        String cronJobScriptName = "fcloud_" + cronJob.getRunAs().getName() + "_" + cronJob.getUid() + ".sh";
+                        cronJobScriptNames.add(cronJobScriptName);
+                        FileTools.writeFileWithContentCheck(scriptPath + cronJobScriptName, contentLines, "700");
+
+                        String cronEntry = cronJob.getTime() + " root /var/infra-crons/" + cronJobScriptName;
+                        cronEntries.add(cronEntry);
+                    }
+
+                    // Create the cron file entries
+                    cronEntries.add(""); // Needs new line at the end of the file
+                    FileTools.writeFileWithContentCheck(hostFs + "/etc/cron.d/fcloud", cronEntries);
+                    for (File scriptFile : new File(hostFs + "/var/infra-crons/").listFiles()) {
+                        if (!cronJobScriptNames.contains(scriptFile.getName())) {
+                            logger.info("Removing extra cron job script {}", scriptFile.getName());
+                            scriptFile.delete();
+                        }
+                    }
 
                     // Install docker-sudo configuration
                     logger.info("Install docker-sudo configuration");
@@ -425,6 +470,17 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                             DirectoryTools.deleteFolder(runningAppDirectory);
                             stagingAppDirectory.renameTo(runningAppDirectory);
                         }
+                    }
+
+                    // Move what is still in staging to failed
+                    logger.info("Update the failed images directory");
+                    for (File stillStagedApp : new File(stagingDirectory).listFiles()) {
+                        File stagingAppDirectory = new File(stagingDirectory + "/" + stillStagedApp.getName());
+                        File failedAppDirectory = new File(runningDirectory + "/" + stillStagedApp.getName());
+
+                        logger.info("Moving {} to {}", stagingAppDirectory.getAbsolutePath(), failedAppDirectory.getAbsolutePath());
+                        DirectoryTools.deleteFolder(failedAppDirectory);
+                        stagingAppDirectory.renameTo(failedAppDirectory);
                     }
 
                 });
