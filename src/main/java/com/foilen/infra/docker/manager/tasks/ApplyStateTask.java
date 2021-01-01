@@ -39,7 +39,7 @@ import com.foilen.infra.docker.manager.services.AlertingService;
 import com.foilen.infra.docker.manager.services.GlobalLockService;
 import com.foilen.infra.docker.manager.services.InfraAppsService;
 import com.foilen.infra.docker.manager.services.InfraUiApiClientManagementService;
-import com.foilen.infra.docker.manager.tasks.callback.NotFailedCallback;
+import com.foilen.infra.docker.manager.tasks.callback.MultipleDockerContainerManagementCallback;
 import com.foilen.infra.docker.manager.tasks.callback.SaveTransformedApplicationDefinitionCallback;
 import com.foilen.infra.plugin.system.utils.DockerUtils;
 import com.foilen.infra.plugin.system.utils.UnixUsersAndGroupsUtils;
@@ -129,7 +129,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
     @Autowired
     private InfraUiApiClientManagementService infraUiApiClientManagementService;
     @Autowired
-    private NotFailedCallback notFailedCallback;
+    private MultipleDockerContainerManagementCallback multipleDockerContainerManagementCallback;
 
     @Autowired
     private SaveTransformedApplicationDefinitionCallback saveTransformedApplicationDefinitionCallback;
@@ -239,7 +239,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     logger.info("Installing applications");
                     ContainersManageContext containersManageContext = new ContainersManageContext();
                     containersManageContext.setDockerState(dockerState);
-                    containersManageContext.setContainerManagementCallback(notFailedCallback);
+                    containersManageContext.setContainerManagementCallback(multipleDockerContainerManagementCallback);
                     containersManageContext.setTransformedApplicationDefinitionCallback(saveTransformedApplicationDefinitionCallback);
                     String stagingDirectory = imageBuildPath + "/staging";
                     String runningDirectory = imageBuildPath + "/running";

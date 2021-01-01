@@ -25,6 +25,8 @@ public interface DbService {
 
     Optional<DockerStateFailed> failedFindByContainerNameAndDockerStateIdsAndLastFailBefore(String containerName, DockerStateIds dockerStateIds, Date lastFailBefore);
 
+    boolean isExplicitlySkipped(String containerName);
+
     void unixUserAdd(String username);
 
     void unixUserDelete(String username);

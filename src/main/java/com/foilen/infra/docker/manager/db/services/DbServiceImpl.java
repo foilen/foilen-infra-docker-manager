@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import com.foilen.infra.docker.manager.db.dao.DockerStateDao;
 import com.foilen.infra.docker.manager.db.dao.InstalledUnixUserDao;
+import com.foilen.infra.docker.manager.db.dao.SkippingDao;
 import com.foilen.infra.plugin.system.utils.model.DockerState;
 import com.foilen.infra.plugin.system.utils.model.DockerStateFailed;
 import com.foilen.infra.plugin.system.utils.model.DockerStateIds;
@@ -31,6 +32,8 @@ public class DbServiceImpl extends AbstractBasics implements DbService {
     private DockerStateDao dockerStateDao;
     @Autowired
     private InstalledUnixUserDao installedUnixUserDao;
+    @Autowired
+    private SkippingDao skippingDao;
 
     @Override
     public DockerState dockerStateLoad() {
@@ -52,6 +55,11 @@ public class DbServiceImpl extends AbstractBasics implements DbService {
             return Optional.empty();
         }
         return Optional.of(dockerStateFailed);
+    }
+
+    @Override
+    public boolean isExplicitlySkipped(String containerName) {
+        return skippingDao.load().getContainerNames().contains(containerName);
     }
 
     public void setDockerStateDao(DockerStateDao dockerStateDao) {
