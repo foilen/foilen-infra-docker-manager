@@ -293,12 +293,12 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
 
                     // Install cron jobs
                     logger.info("Installing cron jobs");
+                    String scriptPath = hostFs + "/var/infra-crons/";
+                    DirectoryTools.createPath(scriptPath, "root", "root", "755");
+
                     List<String> cronEntries = new ArrayList<>();
                     List<String> cronJobScriptNames = new ArrayList<>();
                     for (CronJob cronJob : machineSetup.getCronJobs()) {
-
-                        String scriptPath = hostFs + "/var/infra-crons/";
-                        DirectoryTools.createPath(scriptPath, "root", "root", "755");
 
                         List<String> contentLines = new ArrayList<>();
                         contentLines.add("#!/bin/bash");
