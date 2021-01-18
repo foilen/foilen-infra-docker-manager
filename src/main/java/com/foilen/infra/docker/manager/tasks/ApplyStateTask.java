@@ -272,15 +272,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         outputContext.getInfraVolumes().add(new IPApplicationDefinitionVolume("/var/infra-apps/", "/_infra-apps", 0L, 0L, "555", true));
                         applicationBuildDetails.setOutputContext(outputContext);
                         outputContext.setDockerLogsMaxSizeMB(100);
-                        switch (application.getExecutionPolicy()) {
-                        case ALWAYS_ON:
-                            containersManageContext.getAlwaysRunningApplications().add(applicationBuildDetails);
-                            break;
-                        case CRON:
-                            applicationBuildDetails.setCronTime(application.getExecutionCronDetails());
-                            containersManageContext.getCronApplications().add(applicationBuildDetails);
-                            break;
-                        }
+                        containersManageContext.getApplicationBuildDetails().add(applicationBuildDetails);
 
                         // Keep the exposed ports
                         application.getApplicationDefinition().getPortsEndpoint().forEach((port, endpoint) -> {
