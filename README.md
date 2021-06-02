@@ -11,10 +11,9 @@ Description: This application is creating users and is installing applications t
 Installation:
 
 ```bash
-echo "deb https://dl.bintray.com/foilen/debian stable main" | sudo tee /etc/apt/sources.list.d/foilen.list
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
-sudo apt update
-sudo apt install docker-sudo
+cd /tmp
+wget https://deploy.foilen.com/docker-sudo/docker-sudo_1.3.2_amd64.deb
+dpkg -i docker-sudo_1.3.2_amd64.deb
 ```
 
 # Usage
