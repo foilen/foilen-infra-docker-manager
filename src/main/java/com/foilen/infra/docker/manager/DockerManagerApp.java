@@ -22,7 +22,7 @@ import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.boot.Banner.Mode;
 import org.springframework.boot.SpringApplication;
 import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.web.context.support.StandardServletEnvironment;
+import org.springframework.core.env.StandardEnvironment;
 
 import com.foilen.infra.api.model.machine.MachineSetup;
 import com.foilen.infra.docker.manager.configspring.DockerManagerSpringConfig;
@@ -58,7 +58,7 @@ public class DockerManagerApp {
 
             // Set the environment
             String mode = options.mode;
-            ConfigurableEnvironment environment = new StandardServletEnvironment();
+            ConfigurableEnvironment environment = new StandardEnvironment();
             environment.addActiveProfile(mode);
             System.setProperty("MODE", mode);
 
