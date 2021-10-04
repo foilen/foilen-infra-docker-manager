@@ -81,6 +81,11 @@ public class DbServiceImpl extends AbstractBasics implements DbService {
     }
 
     @Override
+    public boolean unixUserExists(String username) {
+        return installedUnixUserDao.exists(username);
+    }
+
+    @Override
     public List<String> unixUserFindAllNotNeeded(List<String> neededUnixUsers) {
         List<String> notNeeded = new ArrayList<>();
         notNeeded.addAll(installedUnixUserDao.findAllAsList());

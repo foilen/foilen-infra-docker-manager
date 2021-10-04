@@ -27,26 +27,26 @@ eclipse {
 dependencies {
 
   // Internal API
-  compile "com.foilen:foilen-infra-api:$foilenInfraApiVersion"
-  compile "com.foilen:foilen-infra-system-core-execute:$foilenInfraSystemVersion"
+  implementation "com.foilen:foilen-infra-api:$foilenInfraApiVersion"
+  implementation "com.foilen:foilen-infra-system-core-execute:$foilenInfraSystemVersion"
   
   // Spring
-  compile "javax.annotation:javax.annotation-api"
-  compile "org.springframework:spring-context"
-  compile "org.springframework.boot:spring-boot-starter"
+  implementation "javax.annotation:javax.annotation-api"
+  implementation "org.springframework:spring-context"
+  implementation "org.springframework.boot:spring-boot-starter"
 
   // Misc
-  compile "args4j:args4j:$argsVersion"
-  compile "com.foilen:jl-smalltools:$smalltoolsVersion"
-  compile "javax.xml.bind:jaxb-api"
-  compile 'org.freemarker:freemarker'
+  implementation "args4j:args4j:$argsVersion"
+  implementation "com.foilen:jl-smalltools:$smalltoolsVersion"
+  implementation "javax.xml.bind:jaxb-api"
+  implementation 'org.freemarker:freemarker'
 
   // Test
-  testCompileOnly 'junit:junit'
+  testImplementation 'junit:junit'
   testImplementation "org.junit.jupiter:junit-jupiter-api"
   testRuntimeOnly "org.junit.vintage:junit-vintage-engine"
-  testCompile "org.springframework:spring-test"
-  testCompile "org.springframework.boot:spring-boot-starter-test"
+  testImplementation "org.springframework:spring-test"
+  testImplementation "org.springframework.boot:spring-boot-starter-test"
 }
 
 apply plugin: 'application'

@@ -17,6 +17,8 @@ public interface InstalledUnixUserDao {
 
     boolean delete(String username);
 
+    boolean exists(String username);
+
     List<String> findAllAsList();
 
 }

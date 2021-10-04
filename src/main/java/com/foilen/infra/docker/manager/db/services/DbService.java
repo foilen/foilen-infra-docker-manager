@@ -31,6 +31,8 @@ public interface DbService {
 
     void unixUserDelete(String username);
 
+    boolean unixUserExists(String username);
+
     List<String> unixUserFindAllNotNeeded(List<String> neededUnixUsers);
 
 }

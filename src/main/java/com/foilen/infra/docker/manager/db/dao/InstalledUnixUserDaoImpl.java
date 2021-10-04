@@ -26,6 +26,11 @@ public class InstalledUnixUserDaoImpl extends AbstractListSingleJsonFileDao<Stri
     private File stagingFile;
 
     @Override
+    public boolean exists(String username) {
+        return findOne(username).isPresent();
+    }
+
+    @Override
     protected File getFinalFile() {
         return file;
     }

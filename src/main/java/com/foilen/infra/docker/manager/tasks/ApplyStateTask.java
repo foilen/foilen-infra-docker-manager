@@ -189,26 +189,9 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                         String username = unixUser.getName();
                         logger.info("UnixUser: {}", username);
                         unixUserNameById.put(unixUser.getId(), username);
-                        UnixUserDetail existingUser = unixUsersAndGroupsUtils.userGet(username);
-                        if (existingUser == null) {
-                            // Create
-                            logger.info("UnixUser: {} does not exist. Create it", username);
-                            if (unixUsersAndGroupsUtils.userCreate(username, unixUser.getId(), unixUser.getHomeFolder(), null, null)) {
-                                dbService.unixUserAdd(username);
-                            } else {
-                                logger.error("UnixUser: {} was not created succesfully", username);
-                            }
-                        } else {
-                            // Update if needed
-                            if (!StringTools.safeEquals(unixUser.getHomeFolder(), existingUser.getHomeFolder())) {
-                                unixUsersAndGroupsUtils.userHomeUpdate(username, unixUser.getHomeFolder());
-                            }
-                            if (!StringTools.safeEquals(unixUser.getHashedPassword(), existingUser.getHashedPassword())) {
-                                unixUsersAndGroupsUtils.userPasswordUpdate(username, unixUser.getHashedPassword());
-                            }
-                            if (!StringTools.safeEquals(unixUser.getShell(), existingUser.getShell())) {
-                                unixUsersAndGroupsUtils.userShellUpdate(username, unixUser.getShell());
-                            }
+                        unixUsersAndGroupsUtils.userCreateOrUpdate(username, unixUser.getId(), unixUser.getHomeFolder(), unixUser.getShell(), unixUser.getHashedPassword());
+                        if (!dbService.unixUserExists(username)) {
+                            dbService.unixUserAdd(username);
                         }
 
                     }
@@ -436,7 +419,7 @@ public class ApplyStateTask extends AbstractBasics implements Runnable {
                     for (String toDeleteUnixUser : toDeleteUnixUsers) {
                         logger.info("UnixUser to delete: {}", toDeleteUnixUser);
                         UnixUserDetail toDeleteUnixUserDetails = unixUsersAndGroupsUtils.userGet(toDeleteUnixUser);
-                        if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName(), toDeleteUnixUserDetails.getHomeFolder())) {
+                        if (toDeleteUnixUserDetails == null || unixUsersAndGroupsUtils.userRemove(toDeleteUnixUserDetails.getName())) {
                             dbService.unixUserDelete(toDeleteUnixUser);
                         } else {
                             logger.error("UnixUser: {} was not deleted succesfully", toDeleteUnixUser);
