@@ -1,8 +1,11 @@
-FROM openjdk:11-stretch
+FROM ubuntu:22.04
 
 RUN export TERM=dumb ; \
   apt-get update && apt-get install -y \
-    curl ca-certificates \
+    curl \
+    gnupg \
+    wget \
+    openjdk-11-jre \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Infra apps to share
